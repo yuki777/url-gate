@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.5.8](https://github.com/yuki777/url-gate/compare/0.5.7...0.5.8) - 2026-11-27
+
+- feat: show blocked requests on the toolbar button, and unlock a tab from it without reloading the page by @yuki777 in https://github.com/yuki777/url-gate/pull/27
+
 ## [0.5.7](https://github.com/yuki777/url-gate/compare/0.5.6...0.5.7) - 2026-11-27
 
 - feat: make the extension and docs English-only, and link to the wiki setup guide by @yuki777 in https://github.com/yuki777/url-gate/pull/25
