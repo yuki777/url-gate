@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.5.6](https://github.com/yuki777/url-gate/compare/0.5.5...0.5.6) - 2026-11-27
+
+- feat: パスキーを 1Password にも保存できるように、登録先 (RP ID) をドメイン形式にする by @yuki777 in https://github.com/yuki777/url-gate/pull/22
+- docs: 登録し直しが要らない版の番号を 0.5.5 に直す by @yuki777 in https://github.com/yuki777/url-gate/pull/24
+
 ## [0.5.5](https://github.com/yuki777/url-gate/compare/0.5.4...0.5.5) - 2026-11-27
 
 - feat: 中間ページの説明文に URL Gate の名前を入れる by @yuki777 in https://github.com/yuki777/url-gate/pull/20
