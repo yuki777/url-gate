@@ -25,9 +25,10 @@ const GATE_PAGE_URL = chrome.runtime.getURL('gate.html');
 const OPTIONS_PAGE_URL = chrome.runtime.getURL('options.html');
 
 const MILLISECONDS_PER_MINUTE = 60_000;
-// Chromium は拡張ページの RP ID を「chrome-extension://<拡張 ID>」として扱う。実装差に備えて拡張 ID 単体も受け付ける。
 const EXTENSION_ORIGIN = `chrome-extension://${chrome.runtime.id}`;
-const ACCEPTED_RP_IDS = [EXTENSION_ORIGIN, chrome.runtime.id];
+// RP ID を指定せずに登録していた版のクレデンシャル用。Chromium は拡張ページの既定の RP ID を
+// 「chrome-extension://<拡張 ID>」として扱う。実装差に備えて拡張 ID 単体も受け付ける。
+const LEGACY_RP_IDS = [EXTENSION_ORIGIN, chrome.runtime.id];
 
 const challengeKey = (tabId) => `challenge:${tabId}`;
 const unlockExpiryKey = (tabId) => `unlockExpiresAt:${tabId}`;
@@ -227,7 +228,7 @@ async function verifyTouchId(assertion, tabId) {
     assertion,
     expectedChallenge,
     expectedOrigin: EXTENSION_ORIGIN,
-    acceptedRpIds: ACCEPTED_RP_IDS,
+    acceptedRpIds: credential.rpId ? [credential.rpId] : LEGACY_RP_IDS,
   });
 }
 

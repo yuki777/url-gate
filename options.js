@@ -58,7 +58,7 @@ saveButton.addEventListener('click', async () => {
     }
     settingsStatus.textContent = 'Touch ID を待っています…';
     const { challenge } = await sendToBackground({ type: 'challenge' });
-    const assertion = await requestAssertion(credential.credentialId, challenge);
+    const assertion = await requestAssertion(credential, challenge);
     await sendToBackground({
       type: 'saveSettings',
       assertion,
