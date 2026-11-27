@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.5.5](https://github.com/yuki777/url-gate/compare/0.5.4...0.5.5) - 2026-11-27
+
+- feat: 中間ページの説明文に URL Gate の名前を入れる by @yuki777 in https://github.com/yuki777/url-gate/pull/20
+
 ## [0.5.4](https://github.com/yuki777/url-gate/compare/0.5.3...0.5.4) - 2026-11-27
 
 - feat: AWS IAM Identity Center の例を最初から対象 URL に入れ、設定ページの説明を短くする by @yuki777 in https://github.com/yuki777/url-gate/pull/18
