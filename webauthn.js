@@ -1,4 +1,7 @@
 const CREDENTIAL_STORAGE_KEY = 'credential';
+// 登録先（RP ID）。拡張 ID のままだと「chrome-extension://…」という URL 形式になり、1Password が保存できない。
+// ドメイン形式にするために、実在しない自分の名前空間のホストを使う。manifest.json の host_permissions と揃えること。
+export const RELYING_PARTY_ID = 'url-gate.yuki777.github.io';
 const ES256_ALGORITHM = -7;
 const RS256_ALGORITHM = -257;
 // 登録時に認証器へ示す順。先頭ほど優先される。
@@ -37,11 +40,11 @@ export function onCredentialChanged(callback) {
   });
 }
 
-// 拡張ページから呼ぶ。RP ID は指定せず、既定値（拡張 ID）に任せる。
+// 拡張ページから呼ぶ。
 export async function registerCredential() {
   const created = await navigator.credentials.create({
     publicKey: {
-      rp: { name: 'URL Gate' },
+      rp: { id: RELYING_PARTY_ID, name: 'URL Gate' },
       user: {
         id: crypto.getRandomValues(new Uint8Array(16)),
         name: 'url-gate',
@@ -67,16 +70,19 @@ export async function registerCredential() {
     credentialId: toBase64Url(created.rawId),
     publicKeySpki: toBase64Url(created.response.getPublicKey()),
     algorithm,
+    rpId: RELYING_PARTY_ID,
   };
   await chrome.storage.local.set({ [CREDENTIAL_STORAGE_KEY]: credential });
   return credential;
 }
 
-export async function requestAssertion(credentialId, challenge) {
+// rpId が無いのは、RP ID を指定せずに（拡張 ID で）登録していた版のクレデンシャル。その場合は既定値に任せる。
+export async function requestAssertion(credential, challenge) {
   const assertion = await navigator.credentials.get({
     publicKey: {
       challenge: fromBase64Url(challenge),
-      allowCredentials: [{ type: 'public-key', id: fromBase64Url(credentialId) }],
+      ...(credential.rpId ? { rpId: credential.rpId } : {}),
+      allowCredentials: [{ type: 'public-key', id: fromBase64Url(credential.credentialId) }],
       userVerification: 'required',
       timeout: REQUEST_TIMEOUT_MS,
     },

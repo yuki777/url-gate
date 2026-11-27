@@ -30,7 +30,7 @@ function setBusy(isBusy) {
 
 async function unlockWith(credential) {
   const { challenge } = await sendToBackground({ type: 'challenge' });
-  const assertion = await requestAssertion(credential.credentialId, challenge);
+  const assertion = await requestAssertion(credential, challenge);
   await sendToBackground({ type: 'unlock', assertion, target });
 }
 

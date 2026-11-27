@@ -1,6 +1,6 @@
 # プライバシーポリシー / Privacy Policy
 
-最終更新: 2026-11-13
+最終更新: 2026-11-27
 
 ## 日本語
 
@@ -16,7 +16,9 @@ URL Gate は、利用者のデータを収集しません。外部への通信�
   - 指紋などの生体情報。本人確認は OS とブラウザが行い、この拡張には結果の署名だけが渡されます。
   - 閲覧履歴の記録、ページの内容、入力した内容
 - 開発者を含め、第三者にデータを送信、販売、共有することはありません。解析やトラッキングの仕組みも入れていません。
-- 拡張を削除すると、保存したデータはすべて消えます。
+- `url-gate.yuki777.github.io` への権限は、パスキーの登録先の名前（RP ID）として使うためだけのものです。このホストは実在せず、通信もしません。
+- パスキーの保存先に 1Password などのパスワードマネージャーを選んだ場合、そのパスキーの保管と同期は、そのパスワードマネージャーが行います。
+- 拡張を削除すると、拡張が保存したデータはすべて消えます。
 
 問い合わせは [GitHub の Issues](https://github.com/yuki777/url-gate/issues) へお願いします。
 
@@ -34,6 +36,8 @@ URL Gate does not collect any user data and makes no network requests of its own
   - Biometric data such as fingerprints. User verification is performed by the OS and the browser; the extension only receives a signed result.
   - Browsing history logs, page content, or anything you type
 - No data is sent, sold, or shared with anyone, including the developer. There is no analytics or tracking.
-- Removing the extension deletes all stored data.
+- The permission for `url-gate.yuki777.github.io` is used only as the name the passkey is registered under (the RP ID). That host does not exist, and the extension never contacts it.
+- If you choose a password manager such as 1Password as the place to save the passkey, that password manager stores and syncs the passkey.
+- Removing the extension deletes all data the extension stored.
 
 For questions, please open an issue on [GitHub](https://github.com/yuki777/url-gate/issues).
