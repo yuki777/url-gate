@@ -11,9 +11,9 @@ const settingsStatus = document.getElementById('settings-status');
 async function showState() {
   const credential = await loadCredential();
   state.textContent = credential
-    ? '登録済みです。登録し直すと、以前の登録は使えなくなります。'
-    : '未登録です。登録するまで対象 URL は開けず、設定も保存できません。';
-  registerButton.textContent = credential ? 'Touch ID を登録し直す' : 'Touch ID を登録する';
+    ? 'Registered. Registering again replaces the current registration, which stops working.'
+    : 'Not registered yet. Until you register, protected URLs cannot be opened and settings cannot be saved.';
+  registerButton.textContent = credential ? 'Register Touch ID again' : 'Register Touch ID';
 }
 
 function showSettings(settings) {
@@ -22,30 +22,30 @@ function showSettings(settings) {
 
 async function sendToBackground(message) {
   const response = await chrome.runtime.sendMessage(message);
-  if (!response?.ok) throw new Error(response?.error ?? 'バックグラウンドから応答がありません');
+  if (!response?.ok) throw new Error(response?.error ?? 'No response from the background script');
   return response;
 }
 
 registerButton.addEventListener('click', async () => {
   registerButton.disabled = true;
-  status.textContent = 'Touch ID を待っています…';
+  status.textContent = 'Waiting for Touch ID…';
   try {
     await registerCredential();
-    status.textContent = '登録しました。';
+    status.textContent = 'Registered.';
   } catch (error) {
-    console.error('[url-gate] 登録に失敗', error);
-    status.textContent = `登録できませんでした: ${error.message}`;
+    console.error('[url-gate] Registration failed', error);
+    status.textContent = `Could not register: ${error.message}`;
   } finally {
     registerButton.disabled = false;
     await showState();
   }
 });
 
-// 保存はバックグラウンドが Touch ID の署名を検証してから行う。
+// The background script saves only after it has verified the Touch ID signature.
 saveButton.addEventListener('click', async () => {
   const { lines, errors } = parseLines(linesInput.value.split('\n'));
   if (errors.length > 0) {
-    settingsStatus.textContent = `書き方が正しくない行があります: ${errors.join(' / ')}`;
+    settingsStatus.textContent = `Some lines are not written correctly: ${errors.join(' / ')}`;
     return;
   }
 
@@ -53,10 +53,10 @@ saveButton.addEventListener('click', async () => {
   try {
     const credential = await loadCredential();
     if (!credential) {
-      settingsStatus.textContent = '先に Touch ID を登録してください。';
+      settingsStatus.textContent = 'Register Touch ID first.';
       return;
     }
-    settingsStatus.textContent = 'Touch ID を待っています…';
+    settingsStatus.textContent = 'Waiting for Touch ID…';
     const { challenge } = await sendToBackground({ type: 'challenge' });
     const assertion = await requestAssertion(credential, challenge);
     await sendToBackground({
@@ -64,26 +64,26 @@ saveButton.addEventListener('click', async () => {
       assertion,
       settings: { lines },
     });
-    settingsStatus.textContent = '保存しました。';
+    settingsStatus.textContent = 'Saved.';
   } catch (error) {
-    console.error('[url-gate] 設定の保存に失敗', error);
-    settingsStatus.textContent = `保存できませんでした: ${error.message}`;
+    console.error('[url-gate] Failed to save the settings', error);
+    settingsStatus.textContent = `Could not save: ${error.message}`;
   } finally {
     saveButton.disabled = false;
   }
 });
 
-// 保存した内容（重複を除いたもの）や、別のタブで保存した内容を表示し直す。
+// Show the saved lines again (duplicates removed), including a save from another tab.
 onSettingsChanged(showSettings);
 
 showState().catch((error) => {
-  console.error('[url-gate] 状態の取得に失敗', error);
-  state.textContent = `状態を取得できませんでした: ${error.message}`;
+  console.error('[url-gate] Failed to read the registration state', error);
+  state.textContent = `Could not read the registration state: ${error.message}`;
 });
 
 loadSettings()
   .then(showSettings)
   .catch((error) => {
-    console.error('[url-gate] 設定の取得に失敗', error);
-    settingsStatus.textContent = `設定を取得できませんでした: ${error.message}`;
+    console.error('[url-gate] Failed to read the settings', error);
+    settingsStatus.textContent = `Could not read the settings: ${error.message}`;
   });

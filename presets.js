@@ -1,20 +1,20 @@
-// 新しくインストールしたときに、対象 URL に最初から入れておく例（config.js の DEFAULT_SETTINGS）。
-// ここにあるのは設定ページに書けるのと同じ行だけで、特定のサービス向けの処理は持たない。
+// The example that the protected URLs start with on a fresh install (DEFAULT_SETTINGS in config.js).
+// It holds only the same kind of lines anyone can write on the options page; there is no service-specific logic.
 
-// AWS access portal の一覧画面。ここだけは Touch ID なしで開けるようにする。
+// The list screens of the AWS access portal. Only these open without Touch ID.
 const AWS_PORTAL_LIST_FRAGMENTS = ['', '#/', '#/?tab=accounts', '#/?tab=applications'];
 const awsPortalListScreens = (host, paths) =>
   paths.flatMap((path) => AWS_PORTAL_LIST_FRAGMENTS.map((fragment) => `!${host}${path}${fragment}`));
 
-// AWS IAM Identity Center（旧 AWS SSO）。リージョンとサブドメインは任意。
+// AWS IAM Identity Center (formerly AWS SSO). Any region and any subdomain.
 export const AWS_IAM_IDENTITY_CENTER = {
   lines: [
-    '# AWS IAM Identity Center: aws sso login の認可画面と、デバイスコードの確認画面',
+    '# AWS IAM Identity Center: the authorization page of aws sso login and the device code confirmation page',
     'oidc.*.amazonaws.com/authorize',
     'oidc.*.api.aws/authorize',
     'device.sso.*.amazonaws.com',
     '',
-    '# AWS access portal。一覧画面（! の行）だけは Touch ID なしで開ける',
+    '# AWS access portal. Only the list screens (the ! lines) open without Touch ID',
     '*.awsapps.com/start',
     ...awsPortalListScreens('*.awsapps.com', ['/start', '/start/']),
     '*.portal.*.app.aws',
@@ -22,7 +22,7 @@ export const AWS_IAM_IDENTITY_CENTER = {
     '*.*.portal.amazonaws.com',
     ...awsPortalListScreens('*.*.portal.amazonaws.com', ['/', '/start', '/start/']),
     '',
-    '# 認証情報を取り出す通信と、デバイスコードを承認する通信。画面を移動せずに呼べるので、通信も止める',
+    '# Requests that fetch credentials or approve a device code. They can be called without a navigation, so requests are blocked too',
     'all:portal.sso.*.amazonaws.com/federation/',
     'all:portal.sso.*.api.aws/federation/',
     'all:oidc.*.amazonaws.com/device_authorization/',

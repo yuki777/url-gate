@@ -1,131 +1,133 @@
 # URL Gate
 
-指定した URL を開く前に、Touch ID を要求する Chrome 拡張です。
+A Chrome extension that asks for Touch ID before opening the URLs you choose.
 
-ブラウザを操作できる AI エージェントは、ログイン済みのセッションが残っていれば、管理画面や認可画面のボタンを押すだけで重要な操作ができてしまいます。この拡張は、対象 URL への遷移を中間ページに差し替え、人が Touch ID を通すまで先へ進めないようにします。
+An AI agent that can drive your browser can do important things just by pressing a button on an admin or authorization page, as long as a signed-in session is still there. URL Gate replaces a navigation to a protected URL with a gate page, and nothing goes further until a person passes Touch ID.
 
-対象 URL は設定ページで自由に書けます。特定のサービス向けの処理は持っていません。AWS IAM Identity Center（旧 AWS SSO）向けの書き方は、例として最初から対象 URL に入れてあります（[AWS IAM Identity Center の例](docs/aws-iam-identity-center.md)）。使わなければ、設定ページで消して保存できます。
+You write the protected URLs yourself on the options page. There is no service-specific logic. Lines for AWS IAM Identity Center (formerly AWS SSO) are included from the start as an example ([AWS IAM Identity Center example](docs/aws-iam-identity-center.md)). If you don't use it, delete the lines on the options page and save.
 
-## 動作
+New here? The [setup guide](https://github.com/yuki777/url-gate/wiki/Getting-Started) in the wiki walks through installation and the first Touch ID registration with screenshots.
 
-1. 対象 URL へ移動しようとしたタブを、拡張の中間ページに差し替えます。
-2. 中間ページは、開くとすぐに Touch ID のダイアログを出します。WebAuthn（`userVerification: required`、端末内蔵の認証器のみ）を通すと、そのタブだけ 2 分間ブロックを外し、元の URL へ進みます。
-3. 2 分たつか、タブを閉じると、再びブロックします。
+## How it works
 
-ダイアログを閉じたあとは、中間ページの「Touch ID で開く」を押すと、もう一度出ます。戻る操作や再読み込みで中間ページに戻ったときは、自動では出しません。裏のタブで開いた場合は、そのタブに切り替えたときに出ます。
+1. A tab that tries to open a protected URL is redirected to the extension's gate page.
+2. The gate page shows the Touch ID dialog as soon as it opens. Once you pass WebAuthn (`userVerification: required`, built-in authenticator only), that tab alone is unblocked for 2 minutes and continues to the original URL.
+3. After 2 minutes, or when the tab is closed, the URL is blocked again.
 
-ダイアログは、AI エージェントが対象 URL を開こうとしたときにも出ます。自分で開こうとした覚えのないダイアログは、通さずに閉じてください。開こうとしている URL は、中間ページに表示しています。
+If you close the dialog, press "Open with Touch ID" on the gate page to show it again. It is not shown automatically when you come back to the gate page with the back button or a reload. If the gate page opened in a background tab, the dialog appears when you switch to that tab.
 
-差し替えとは別に、declarativeNetRequest（ブラウザ側で通信を止める拡張 API）のルールでも止めています。拡張の処理が間に合わなかった場合でも、Touch ID を通していないタブからは通信が出ません。
+The dialog also appears when an AI agent tries to open a protected URL. If you see a dialog you did not ask for, close it without approving. The gate page shows the URL that is about to be opened.
 
-## 対象 URL の設定
+Besides the redirect, the same URLs are blocked with declarativeNetRequest rules (the extension API that blocks requests inside the browser). Even if the extension's own code is too late, no request leaves a tab that has not passed Touch ID.
 
-拡張の「詳細」→「拡張機能のオプション」で、対象にする URL を 1 行に 1 つ書き、「Touch ID で保存する」を押します。対象を外す操作にもなるので、保存にも Touch ID が必要です（先に Touch ID の登録が必要です）。
+## Protected URLs
+
+Open the extension's "Details" → "Extension options", write one URL per line, and press "Save with Touch ID". Saving can also remove protection, so it requires Touch ID too (register Touch ID first).
 
 ```
-# 管理画面を開く前に Touch ID を求める
+# Ask for Touch ID before opening the admin pages
 example.com/admin
 *.internal.example.com
 
-# ヘルプだけは Touch ID なしで開ける
+# Only the help page opens without Touch ID
 !example.com/admin/help
 ```
 
-### 行の種類
+### Kinds of lines
 
-| 行 | 意味 |
+| Line | Meaning |
 |---|---|
-| `example.com/admin` | 対象 URL。このページを開く前に Touch ID を求めます |
-| `!example.com/admin/help` | 例外。対象 URL のうち、このページだけは Touch ID なしで開けます |
-| `# メモ` | コメント。空行と合わせて、そのまま保存します |
+| `example.com/admin` | Protected URL. Touch ID is required before opening this page |
+| `!example.com/admin/help` | Exception. Within the protected URLs, only this page opens without Touch ID |
+| `# note` | Comment. Saved as is, along with blank lines |
 
-### URL の書き方
+### How to write URLs
 
-- スキーム（`https://`）は省けます。http と https の両方が対象になります。
-- ホストの `*` はホスト名の一部に一致します。先頭の `*.` はサブドメインなしにも一致するので、`*.example.com` は `example.com` と `a.b.example.com` の両方に一致します。
-- パスは前方一致です。パスの `*` は任意の文字列に一致します。パスを省くと、そのホストのすべてのページが対象です。大文字と小文字は区別しません。
-- ポートを書かなければ、どのポートでも一致します（`example.com:8443` のように書くと、そのポートだけになります）。既定のポート（`:443`、`:80`）は、ブラウザが URL から省くので、省いた URL にも一致します。
-- URL の `#` 以降（フラグメント）は、対象 URL には書けません。通信の URL に含まれず、ブロックルールで止められないためです。
-- 日本語のドメインやパスも、そのまま書けます（ブラウザと同じ形に直してから比べます。`127.1` のような IPv4 の省略形も同様です）。
-- 続けて書いた `*` は 1 つにまとめます。
-- 対象 URL と例外は、合わせて 1,000 件までです（Chrome のブロックルールの上限）。
+- The scheme (`https://`) is optional. Both http and https are protected either way.
+- `*` in the host matches part of a hostname. A leading `*.` also matches the host without a subdomain, so `*.example.com` matches both `example.com` and `a.b.example.com`.
+- The path is a prefix match. `*` in the path matches any string. Without a path, every page on the host is protected. Case is ignored.
+- Without a port, any port matches (`example.com:8443` matches only that port). The browser drops default ports (`:443`, `:80`) from URLs, so a line with a default port also matches the URL without it.
+- A fragment (`#` and what follows) cannot be written in a protected URL. It is not part of the request URL, so block rules cannot stop it.
+- Internationalized domain names and non-ASCII paths can be written as they are (they are normalized the way the browser does before comparing, and so is IPv4 shorthand such as `127.1`).
+- Consecutive `*` are collapsed into one.
+- Protected URLs and exceptions can total up to 1,000 lines (Chrome's limit on block rules).
 
-### 例外の書き方
+### How to write exceptions
 
-外す範囲が広がりすぎないように、例外（`!`）は書いたとおりの URL だけに一致します。
+To keep the unprotected range from growing too wide, an exception (`!`) matches only the URL exactly as written.
 
-- パスは完全一致です。大文字と小文字も区別します。パスを省くと、トップページ（`/`）だけを指します。
-- まとめて外すときは `*` を使います（`!example.com/docs/*`）。
-- `#` 以降も書けます。1 つのページの中で `#` 以降だけが変わるサイトで、特定の画面だけを外せます（`!app.example.com/#/list`）。
-- `#` 以降を書かなければ、`#` 以降の無い URL だけに一致します。ページ内リンクも通すときは `#*` を付けます（`!example.com/docs/guide#*`）。
-- `#` 以降だけが違う画面は、通信の URL では見分けられません。`#` 以降を書いた例外があるページは、iframe の中では `#` 以降にかかわらず読み込めます。
+- The path is an exact match and case-sensitive. Without a path, it means the top page (`/`) only.
+- Use `*` to exclude several pages at once (`!example.com/docs/*`).
+- A fragment is allowed. On a site where only the fragment changes within one page, this excludes specific screens (`!app.example.com/#/list`).
+- Without a fragment, an exception matches only URLs that have none. Add `#*` to let in-page links through as well (`!example.com/docs/guide#*`).
+- Screens that differ only in the fragment cannot be told apart by the request URL. A page that has an exception with a fragment can be loaded inside an iframe whatever its fragment.
 
-URL の解釈は [config.js](config.js) の `parseLine` にあります。
+URLs are parsed by `parseLine` in [config.js](config.js).
 
-ここまでは、人が画面として開く URL を止める書き方です。ページの中のスクリプトからの通信まで止める書き方は、[詳しい書き方](docs/advanced.md) にあります。
+Everything above is about URLs that a person opens as a page. To also block requests made by scripts inside a page, see [Advanced syntax](docs/advanced.md).
 
-## インストール
+## Install
 
-Chrome 122 以降（Chromium 系ブラウザ）と、Touch ID のある Mac が必要です。
+You need Chrome 122 or later (or another Chromium-based browser) and a Mac with Touch ID. The [setup guide](https://github.com/yuki777/url-gate/wiki/Getting-Started) shows each step with screenshots.
 
-1. このリポジトリを clone するか、zip で取得して展開します。
-2. `chrome://extensions` を開き、「デベロッパー モード」を有効にします。
-3. 「パッケージ化されていない拡張機能を読み込む」で、このフォルダを選びます。
-4. インストールすると設定ページが開くので、「Touch ID を登録する」を押します（あとから開くときは、拡張の「詳細」→「拡張機能のオプション」です）。
-5. 対象 URL には、最初から AWS IAM Identity Center の例が入っています。同じページで、対象にする URL に書き換えて保存します。
+1. Clone this repository, or download it as a zip and extract it.
+2. Open `chrome://extensions` and turn on "Developer mode".
+3. Press "Load unpacked" and choose this folder.
+4. The options page opens after installation. Press "Register Touch ID" there (to open it later, go to the extension's "Details" → "Extension options").
+5. The protected URLs start with the AWS IAM Identity Center example. On the same page, replace it with the URLs you want to protect and save.
 
-更新するときは、新しいファイルに置き換えてから、`chrome://extensions` でこの拡張の再読み込みボタンを押します。
+To update, replace the files with the new ones and press the reload button for this extension on `chrome://extensions`.
 
-登録前に対象 URL を開いた場合は、中間ページに「Touch ID を登録して開く」が出ます。押すと登録し、続けて Touch ID で本人確認をして、そのまま元の URL へ進みます（Touch ID は登録と本人確認で 2 回求められます）。
+If you open a protected URL before registering, the gate page shows "Register Touch ID and open". Pressing it registers, then verifies you with Touch ID, and continues to the original URL (Touch ID is requested twice, once to register and once to verify).
 
-登録するときに、パスキーの保存先を選べます。
+When you register, you can choose where the passkey is saved.
 
-- **Chrome プロファイルに保存**（この Mac に保存）: 鍵は、この Mac のこの Chrome プロファイルの中だけに保存され、Touch ID で使います。ほかの端末には同期されません。迷ったらこちらを選びます。
-- **1Password に保存**: 登録時に出る 1Password の保存ダイアログで保存します。以後の本人確認は 1Password が行い（Touch ID を使うかどうかは 1Password の設定によります）、パスキーは 1Password を入れたほかの端末にも同期されます。
+- **Chrome profile** (saved on this Mac): the key is kept only in this Chrome profile on this Mac and is used with Touch ID. It does not sync to other devices. Choose this if you are not sure.
+- **1Password**: save it from the 1Password dialog that appears during registration. From then on 1Password performs the verification (whether it uses Touch ID depends on your 1Password settings), and the passkey syncs to your other devices with 1Password.
 
-保存先を変えるときは、設定ページで登録し直します。0.5.5 までの版で登録した分は、登録し直さなくてもそのまま使えます。
+To change where the passkey is saved, register again on the options page. A registration made with 0.5.5 or earlier keeps working without registering again.
 
-パスキーの登録先（RP ID）は `url-gate.yuki777.github.io` です。1Password などがパスキーを保存できるように付けた名前で、このホストは実在せず、通信もしません。`manifest.json` の `host_permissions` は、この名前を登録先として使うためだけのものです。
+The passkey is registered under the name (RP ID) `url-gate.yuki777.github.io`. The name exists so that 1Password and similar tools can save the passkey. The host does not exist and is never contacted. `host_permissions` in `manifest.json` is there only to use this name as the RP ID.
 
-## 防げないこと
+## What it does not prevent
 
-この拡張は、ブラウザ上の操作に確認を 1 段はさむだけです。次の経路は防げません。
+URL Gate only adds one confirmation step to actions in the browser. It does not prevent the following.
 
-- 拡張の無効化や削除、別プロファイル、シークレットウィンドウ（拡張を許可していない場合）、別のブラウザ
-- 解除してから 2 分以内の、同じタブでの操作。再ロックはブラウザのアラームで行うため、アラームが遅れると、その分だけ解除が長く残ります
-- すでに開いているページの中のスクリプトが、対象 URL に送る通信（止めるのはページを開く操作です。通信まで止める書き方は [詳しい書き方](docs/advanced.md) にあります）
-- 1 つのページの中で画面が切り替わる（URL の `#` 以降や History API で変わる）サイトで、切り替わった直後の一瞬（差し替えは切り替えの検知後に行うため）
-- 例外にしたページに出る情報の閲覧（AWS の例なら、access portal の一覧画面のアカウント名、アカウント ID、ロール名）
-- `#` 以降を書いた例外があるページを、iframe の中で開くこと（`#` 以降は通信の URL に含まれないため）
-- 開発者ツールなどで拡張のページを直接操作して、設定を書き換えること
-- OS のユーザー確認で、Touch ID の代わりに Mac のログインパスワードを入力すること
-- ブラウザ内蔵の AI アシスタントなど、拡張のルールを通らずにページを開く仕組み（未確認）
-- ブラウザを使わない経路（すでに発行済みの認証情報やトークンの利用など）
+- Disabling or removing the extension, another profile, an incognito window (unless the extension is allowed there), or another browser
+- Actions in the same tab within 2 minutes of unlocking. Relocking uses a browser alarm, so if the alarm is late the tab stays unlocked that much longer
+- Requests to a protected URL from a script in a page that is already open (what is blocked is opening the page; to block requests too, see [Advanced syntax](docs/advanced.md))
+- The brief moment right after the screen changes on a site that switches screens within one page (through the fragment or the History API), because the redirect happens after the change is detected
+- Reading what is shown on a page you made an exception (in the AWS example, the account names, account IDs and role names on the access portal's list screen)
+- Opening, inside an iframe, a page that has an exception with a fragment (the fragment is not part of the request URL)
+- Rewriting the settings by operating the extension's pages directly, for example with developer tools
+- Entering the Mac login password instead of Touch ID in the OS verification dialog
+- Mechanisms that open pages without going through extension rules, such as an AI assistant built into the browser (not verified)
+- Routes that do not use the browser (such as credentials or tokens that were already issued)
 
-確実に防ぐ必要がある場合は、対象サービス側の設定（セッション時間の短縮、MFA の要求、権限の絞り込み）と併用してください。
+If you need a firm guarantee, combine URL Gate with settings on the service itself (shorter sessions, requiring MFA, narrower permissions).
 
-## 構成
+## Files
 
-| ファイル | 役割 |
+| File | Role |
 |---|---|
-| `manifest.json` | 拡張の定義。`key` は拡張 ID を固定するための公開鍵です |
-| `config.js` | 設定の行（対象 URL、例外）の解釈、設定の読み書き、解除時間の定義 |
-| `presets.js` | 最初から対象 URL に入れてある例（AWS IAM Identity Center） |
-| `background.js` | ブロックルールの登録、中間ページへの差し替え、署名の検証、タブ単位の解除、設定の保存 |
-| `webauthn.js` | Touch ID の登録、認証要求、署名の検証 |
-| `gate.html` / `gate.js` | 中間ページ |
-| `options.html` / `options.js` | 設定ページ（Touch ID の登録、対象 URL の設定） |
-| `icons/` | アイコン。`icon.svg` が元の絵で、PNG はそれを書き出したものです |
-| `scripts/package.mjs` | Chrome Web Store に提出する zip を `dist/` に作ります（`node scripts/package.mjs`） |
-| `docs/` | 詳しい書き方と、AWS IAM Identity Center の例の説明 |
-| `test/` | 設定の行の解釈のテスト（`node --test` で実行） |
+| `manifest.json` | The extension manifest. `key` is the public key that pins the extension ID |
+| `config.js` | Parsing of the settings lines (protected URLs, exceptions), reading and writing settings, the unlock duration |
+| `presets.js` | The example the protected URLs start with (AWS IAM Identity Center) |
+| `background.js` | Registering block rules, redirecting to the gate page, verifying signatures, per-tab unlock, saving settings |
+| `webauthn.js` | Touch ID registration, assertion requests, signature verification |
+| `gate.html` / `gate.js` | The gate page |
+| `options.html` / `options.js` | The options page (Touch ID registration, protected URLs) |
+| `icons/` | Icons. `icon.svg` is the source; the PNGs are exported from it |
+| `scripts/package.mjs` | Builds the zip for the Chrome Web Store in `dist/` (`node scripts/package.mjs`) |
+| `docs/` | Advanced syntax, the AWS IAM Identity Center example, and the images used by the wiki |
+| `test/` | Tests for parsing the settings lines (run with `node --test`) |
 
-外部への通信はありません。登録した公開鍵とクレデンシャル ID、対象 URL の設定は `chrome.storage.local` に保存します。詳しくは [プライバシーポリシー](PRIVACY.md) にあります。
+The extension makes no network requests of its own. The registered public key and credential ID, and the protected URL settings, are stored in `chrome.storage.local`. See the [privacy policy](PRIVACY.md) for details.
 
-## リリース
+## Releases
 
-[tagpr](https://github.com/Songmu/tagpr) で行います。main に push されると、`manifest.json` の version と `CHANGELOG.md` を更新するリリース PR が作られます。そのリリース PR をマージすると、タグと GitHub Release が作られ、Chrome Web Store に提出する zip（`url-gate-<version>.zip`）が GitHub Release に付きます。この zip は、拡張の動作に要らないファイルと `manifest.json` の `key` を除いたものです。上げ幅は既定でパッチです。リリース PR に `tagpr:minor` / `tagpr:major` ラベルを付けるか、リリースに含まれる PR に `minor` / `major` ラベルを付けておくと変えられます。リリース PR の `manifest.json` の version を直接書き換えると、それが優先されます。
+Releases use [tagpr](https://github.com/Songmu/tagpr). A push to main creates a release PR that bumps `version` in `manifest.json` and updates `CHANGELOG.md`. Merging that release PR creates the tag and the GitHub Release, and attaches the zip for the Chrome Web Store (`url-gate-<version>.zip`) to the GitHub Release. The zip leaves out the files the extension does not need at runtime and the `key` in `manifest.json`. The default bump is a patch. Add a `tagpr:minor` / `tagpr:major` label to the release PR, or a `minor` / `major` label to a PR included in the release, to change it. Editing `version` in `manifest.json` directly on the release PR takes priority.
 
-## ライセンス
+## License
 
 [MIT](LICENSE)

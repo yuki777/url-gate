@@ -1,10 +1,10 @@
 const CREDENTIAL_STORAGE_KEY = 'credential';
-// 登録先（RP ID）。拡張 ID のままだと「chrome-extension://…」という URL 形式になり、1Password が保存できない。
-// ドメイン形式にするために、実在しない自分の名前空間のホストを使う。manifest.json の host_permissions と揃えること。
+// The relying party ID. Left as the extension ID it takes the URL form "chrome-extension://...", which 1Password cannot save.
+// To make it a domain, a host in our own namespace that does not exist is used. Keep it in sync with host_permissions in manifest.json.
 export const RELYING_PARTY_ID = 'url-gate.yuki777.github.io';
 const ES256_ALGORITHM = -7;
 const RS256_ALGORITHM = -257;
-// 登録時に認証器へ示す順。先頭ほど優先される。
+// The order offered to the authenticator at registration. Earlier entries are preferred.
 const SUPPORTED_ALGORITHMS = [ES256_ALGORITHM, RS256_ALGORITHM];
 const RP_ID_HASH_LENGTH = 32;
 const FLAG_USER_PRESENT = 0x01;
@@ -32,7 +32,7 @@ export async function loadCredential() {
   return stored[CREDENTIAL_STORAGE_KEY] ?? null;
 }
 
-// 登録が変わったら（別のタブで登録した場合も）新しい値で callback を呼ぶ。
+// Call the callback with the new value whenever the registration changes (including a registration from another tab).
 export function onCredentialChanged(callback) {
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== 'local' || !(CREDENTIAL_STORAGE_KEY in changes)) return;
@@ -40,7 +40,7 @@ export function onCredentialChanged(callback) {
   });
 }
 
-// 拡張ページから呼ぶ。
+// Called from extension pages.
 export async function registerCredential() {
   const created = await navigator.credentials.create({
     publicKey: {
@@ -51,7 +51,7 @@ export async function registerCredential() {
         displayName: 'URL Gate',
       },
       challenge: fromBase64Url(randomChallenge()),
-      // Touch ID は ES256 を返す。RS256 も並べておかないと、Chrome が互換性の警告を出す。
+      // Touch ID returns ES256. Chrome shows a compatibility warning unless RS256 is listed as well.
       pubKeyCredParams: SUPPORTED_ALGORITHMS.map((alg) => ({ type: 'public-key', alg })),
       authenticatorSelection: {
         authenticatorAttachment: 'platform',
@@ -64,7 +64,7 @@ export async function registerCredential() {
   });
   const algorithm = created.response.getPublicKeyAlgorithm();
   if (!SUPPORTED_ALGORITHMS.includes(algorithm)) {
-    throw new Error(`認証器が対応していない鍵（アルゴリズム ${algorithm}）を返しました`);
+    throw new Error(`The authenticator returned an unsupported key (algorithm ${algorithm})`);
   }
   const credential = {
     credentialId: toBase64Url(created.rawId),
@@ -76,7 +76,7 @@ export async function registerCredential() {
   return credential;
 }
 
-// rpId が無いのは、RP ID を指定せずに（拡張 ID で）登録していた版のクレデンシャル。その場合は既定値に任せる。
+// A credential without rpId was registered by a version that did not specify an RP ID (it used the extension ID). The default is used for those.
 export async function requestAssertion(credential, challenge) {
   const assertion = await navigator.credentials.get({
     publicKey: {
@@ -94,30 +94,30 @@ export async function requestAssertion(credential, challenge) {
   };
 }
 
-// WebAuthn の署名は ASN.1 DER、WebCrypto は r||s の固定長を要求するので変換する。
+// WebAuthn signatures are ASN.1 DER, while WebCrypto wants fixed-length r||s, so convert.
 function derSignatureToRaw(der) {
   let offset = der[1] & 0x80 ? 2 + (der[1] & 0x7f) : 2;
   const readInteger = () => {
-    if (der[offset] !== 0x02) throw new Error('署名の形式が不正です');
+    if (der[offset] !== 0x02) throw new Error('The signature format is invalid');
     const length = der[offset + 1];
     const start = offset + 2;
     const end = start + length;
-    if (end > der.length) throw new Error('署名の形式が不正です');
+    if (end > der.length) throw new Error('The signature format is invalid');
     offset = end;
     let value = der.subarray(start, end);
     while (value.length > P256_COORDINATE_LENGTH && value[0] === 0) value = value.subarray(1);
-    if (value.length > P256_COORDINATE_LENGTH) throw new Error('署名の形式が不正です');
+    if (value.length > P256_COORDINATE_LENGTH) throw new Error('The signature format is invalid');
     const padded = new Uint8Array(P256_COORDINATE_LENGTH);
     padded.set(value, P256_COORDINATE_LENGTH - value.length);
     return padded;
   };
-  if (der[0] !== 0x30) throw new Error('署名の形式が不正です');
+  if (der[0] !== 0x30) throw new Error('The signature format is invalid');
   const r = readInteger();
   const s = readInteger();
   return Uint8Array.from([...r, ...s]);
 }
 
-// COSE のアルゴリズム ID ごとの WebCrypto の指定。
+// WebCrypto parameters for each COSE algorithm ID.
 const VERIFIERS = {
   [ES256_ALGORITHM]: {
     importParams: { name: 'ECDSA', namedCurve: 'P-256' },
@@ -135,34 +135,34 @@ async function matchesRpId(actualRpIdHash, rpId) {
   return actualRpIdHash.length === RP_ID_HASH_LENGTH && expected.every((byte, index) => byte === actualRpIdHash[index]);
 }
 
-// 検証に失敗したら例外を投げる。成功時は何も返さない。
-// algorithm が無いのは ES256 だけに対応していた版で登録したクレデンシャル。
+// Throws when verification fails. Returns nothing on success.
+// A credential without algorithm was registered by a version that supported ES256 only.
 export async function verifyAssertion({
   publicKeySpki,
   algorithm = ES256_ALGORITHM,
-  assertion, 
+  assertion,
   expectedChallenge,
   expectedOrigin,
   acceptedRpIds,
 }) {
   const verifier = VERIFIERS[algorithm];
-  if (!verifier) throw new Error(`対応していない鍵のアルゴリズムです: ${algorithm}`);
+  if (!verifier) throw new Error(`Unsupported key algorithm: ${algorithm}`);
 
   const authenticatorData = fromBase64Url(assertion.authenticatorData);
   const clientDataBytes = fromBase64Url(assertion.clientDataJSON);
   const clientData = JSON.parse(new TextDecoder().decode(clientDataBytes));
 
-  if (clientData.type !== 'webauthn.get') throw new Error('認証の種別が不正です');
-  if (clientData.challenge !== expectedChallenge) throw new Error('チャレンジが一致しません');
-  if (clientData.origin !== expectedOrigin) throw new Error('オリジンが一致しません');
+  if (clientData.type !== 'webauthn.get') throw new Error('The assertion type is invalid');
+  if (clientData.challenge !== expectedChallenge) throw new Error('The challenge does not match');
+  if (clientData.origin !== expectedOrigin) throw new Error('The origin does not match');
 
   const actualRpIdHash = authenticatorData.subarray(0, RP_ID_HASH_LENGTH);
   const rpIdMatches = await Promise.all(acceptedRpIds.map((rpId) => matchesRpId(actualRpIdHash, rpId)));
-  if (!rpIdMatches.includes(true)) throw new Error('RP ID が一致しません');
+  if (!rpIdMatches.includes(true)) throw new Error('The RP ID does not match');
 
   const flags = authenticatorData[RP_ID_HASH_LENGTH];
   if (!(flags & FLAG_USER_PRESENT) || !(flags & FLAG_USER_VERIFIED)) {
-    throw new Error('本人確認（Touch ID）が行われていません');
+    throw new Error('User verification (Touch ID) was not performed');
   }
 
   const publicKey = await crypto.subtle.importKey(
@@ -180,5 +180,5 @@ export async function verifyAssertion({
     verifier.toWebCryptoSignature(fromBase64Url(assertion.signature)),
     signedData,
   );
-  if (!isValid) throw new Error('署名が不正です');
+  if (!isValid) throw new Error('The signature is invalid');
 }

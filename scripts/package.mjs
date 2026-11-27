@@ -1,6 +1,6 @@
-// Chrome Web Store に提出する zip を dist/ に作る。実行: node scripts/package.mjs
-// 拡張の動作に要らないファイルと、manifest.json の key を除く。
-// key は、パッケージ化されていない拡張の ID を固定するためのもの。ストアでは ID をストアが決めるので、入れない。
+// Build the zip for the Chrome Web Store in dist/. Run: node scripts/package.mjs
+// Leaves out the files the extension does not need at runtime, and the key in manifest.json.
+// key pins the ID of the unpacked extension. The store assigns its own ID, so it is not included.
 import { execFileSync } from 'node:child_process';
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
