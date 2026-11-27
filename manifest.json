@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "URL Gate",
-  "version": "0.5.7",
+  "version": "0.5.8",
   "description": "Asks for Touch ID before opening the URLs you choose.",
   "homepage_url": "https://github.com/yuki777/url-gate",
   "minimum_chrome_version": "122",
