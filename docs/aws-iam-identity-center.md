@@ -81,7 +81,14 @@ Only the list screens (`/start/`, `/start/#/`, `/start/#/?tab=accounts`, `/start
 
 These are the requests the access portal makes to get a console sign-in URL or access keys, and the requests that approve a device code. They can be called without a navigation, so the requests themselves are blocked in every tab that has not passed Touch ID. The meaning of the leading `all:` is explained in [Advanced syntax](advanced.md).
 
-To show access keys on the list screen, press [the extension's toolbar button](advanced.md#the-toolbar-button) to unlock that tab.
+### Showing access keys
+
+The list screen opens without Touch ID, so pressing "Access keys" there fails: the portal shows an error such as "Network Error", and the extension's toolbar button shows the number of blocked requests. To get the keys:
+
+1. Press [the extension's toolbar button](advanced.md#the-toolbar-button) in the tab of the access portal and pass Touch ID. The gate page opens in a new tab and closes by itself; the portal is not reloaded.
+2. Within 2 minutes, press "Access keys" again, or the retry button if the error is still shown.
+
+Touch ID passed in another tab does not count. For example, after opening the console from a role link (which asks for Touch ID in the new tab), the tab of the access portal is still blocked.
 
 ## Updating from 0.3 or earlier
 

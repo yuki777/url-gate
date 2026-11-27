@@ -20,6 +20,8 @@ The dialog also appears when an AI agent tries to open a protected URL. If you s
 
 Besides the redirect, the same URLs are blocked with declarativeNetRequest rules (the extension API that blocks requests inside the browser). Even if the extension's own code is too late, no request leaves a tab that has not passed Touch ID.
 
+The extension's toolbar button shows ✓ while the current tab is unlocked. Otherwise it shows how many requests URL Gate has blocked in the tab, if any. Pressing it unlocks the tab without reloading the page, for the cases where no gate appears on its own ([the toolbar button](docs/advanced.md#the-toolbar-button)).
+
 ## Protected URLs
 
 Open the extension's "Details" → "Extension options", write one URL per line, and press "Save with Touch ID". Saving can also remove protection, so it requires Touch ID too (register Touch ID first).
