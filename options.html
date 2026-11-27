@@ -18,23 +18,14 @@
     <label for="lines">対象 URL（1 行に 1 つ）</label>
     <textarea id="lines" class="url" rows="16" spellcheck="false"
       placeholder="example.com/admin&#10;!example.com/admin/help"></textarea>
-    <p id="presets"></p>
-
-    <h3>行の種類</h3>
-    <ul class="hint">
-      <li><code>example.com/admin</code>: このページを開く前に、Touch ID を求めます。</li>
-      <li><code>!example.com/admin/help</code>: 行頭に <code>!</code> を付けると例外です。対象 URL のうち、このページだけは Touch ID なしで開けます。</li>
-      <li><code>#</code> で始まる行はコメントです。</li>
-    </ul>
-    <p class="hint">ページの中のスクリプトからの通信も止める書き方（<code>all:</code> で始まる行）は、<a href="https://github.com/yuki777/url-gate/blob/main/docs/advanced.md" target="_blank" rel="noopener noreferrer">詳しい書き方</a>にあります。</p>
 
     <h3>URL の書き方</h3>
     <ul class="hint">
-      <li>スキームは省けます。http と https の両方が対象です。</li>
-      <li>ホストの <code>*</code> はホスト名の一部に一致します（<code>*.example.com</code> は <code>example.com</code> にも一致します）。</li>
-      <li>パスは前方一致です。パスの <code>*</code> は任意の文字列に一致します。パスを省くと、そのホストのすべてのページが対象です。</li>
-      <li>例外（<code>!</code>）だけは完全一致で、<code>#</code> 以降も書けます。まとめて外すときは <code>*</code> を使います。</li>
+      <li><code>example.com/admin</code>: このページと、その先のページを開く前に、Touch ID を求めます。</li>
+      <li><code>!example.com/admin/help</code>: 行頭に <code>!</code> を付けると例外で、Touch ID なしで開けます。</li>
+      <li><code>*</code> は任意の文字列に一致します（<code>*.example.com</code>）。<code>#</code> で始まる行はコメントです。</li>
     </ul>
+    <p class="hint">ほかの書き方は、<a href="https://github.com/yuki777/url-gate#対象-url-の設定" target="_blank" rel="noopener noreferrer">詳しい書き方</a>にあります。</p>
 
     <button id="save" type="button">Touch ID で保存する</button>
     <p id="settings-status" role="status"></p>

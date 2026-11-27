@@ -1,4 +1,4 @@
-// 設定ページのボタンで、対象 URL の欄に追加できる例。
+// 新しくインストールしたときに、対象 URL に最初から入れておく例（config.js の DEFAULT_SETTINGS）。
 // ここにあるのは設定ページに書けるのと同じ行だけで、特定のサービス向けの処理は持たない。
 
 // AWS access portal の一覧画面。ここだけは Touch ID なしで開けるようにする。
@@ -8,7 +8,6 @@ const awsPortalListScreens = (host, paths) =>
 
 // AWS IAM Identity Center（旧 AWS SSO）。リージョンとサブドメインは任意。
 export const AWS_IAM_IDENTITY_CENTER = {
-  name: 'AWS IAM Identity Center',
   lines: [
     '# AWS IAM Identity Center: aws sso login の認可画面と、デバイスコードの確認画面',
     'oidc.*.amazonaws.com/authorize',
@@ -30,5 +29,3 @@ export const AWS_IAM_IDENTITY_CENTER = {
     'all:oidc.*.api.aws/device_authorization/',
   ],
 };
-
-export const PRESETS = [AWS_IAM_IDENTITY_CENTER];

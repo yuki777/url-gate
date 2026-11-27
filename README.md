@@ -4,7 +4,7 @@
 
 ブラウザを操作できる AI エージェントは、ログイン済みのセッションが残っていれば、管理画面や認可画面のボタンを押すだけで重要な操作ができてしまいます。この拡張は、対象 URL への遷移を中間ページに差し替え、人が Touch ID を通すまで先へ進めないようにします。
 
-対象 URL は設定ページで自由に書けます。特定のサービス向けの処理は持っていません。AWS IAM Identity Center（旧 AWS SSO）向けの書き方は、設定ページのボタンで追加できる例として用意しています（[AWS IAM Identity Center の例](docs/aws-iam-identity-center.md)）。
+対象 URL は設定ページで自由に書けます。特定のサービス向けの処理は持っていません。AWS IAM Identity Center（旧 AWS SSO）向けの書き方は、例として最初から対象 URL に入れてあります（[AWS IAM Identity Center の例](docs/aws-iam-identity-center.md)）。使わなければ、設定ページで消して保存できます。
 
 ## 動作
 
@@ -72,7 +72,7 @@ Chrome 122 以降（Chromium 系ブラウザ）と、Touch ID のある Mac が�
 2. `chrome://extensions` を開き、「デベロッパー モード」を有効にします。
 3. 「パッケージ化されていない拡張機能を読み込む」で、このフォルダを選びます。
 4. インストールすると設定ページが開くので、「Touch ID を登録する」を押します（あとから開くときは、拡張の「詳細」→「拡張機能のオプション」です）。
-5. 同じページで、対象にする URL を書いて保存します。
+5. 対象 URL には、最初から AWS IAM Identity Center の例が入っています。同じページで、対象にする URL に書き換えて保存します。
 
 更新するときは、新しいファイルに置き換えてから、`chrome://extensions` でこの拡張の再読み込みボタンを押します。
 
@@ -103,7 +103,7 @@ Chrome 122 以降（Chromium 系ブラウザ）と、Touch ID のある Mac が�
 |---|---|
 | `manifest.json` | 拡張の定義。`key` は拡張 ID を固定するための公開鍵です |
 | `config.js` | 設定の行（対象 URL、例外）の解釈、設定の読み書き、解除時間の定義 |
-| `presets.js` | 設定ページのボタンで追加できる例（AWS IAM Identity Center） |
+| `presets.js` | 最初から対象 URL に入れてある例（AWS IAM Identity Center） |
 | `background.js` | ブロックルールの登録、中間ページへの差し替え、署名の検証、タブ単位の解除、設定の保存 |
 | `webauthn.js` | Touch ID の登録、認証要求、署名の検証 |
 | `gate.html` / `gate.js` | 中間ページ |

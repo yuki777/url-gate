@@ -10,7 +10,9 @@ export const UNLOCK_MINUTES = 2;
 
 const SETTINGS_STORAGE_KEY = 'settings';
 // lines は設定ページに書いた行（対象 URL、例外、コメント、空行）。
-export const DEFAULT_SETTINGS = Object.freeze({ lines: [] });
+// 設定を保存していないときの対象 URL は、AWS IAM Identity Center の例。新しくインストールすると、これが入る。
+// 設定ページに書けるのと同じ行なので、使わなければ消して保存できる。
+export const DEFAULT_SETTINGS = Object.freeze({ lines: Object.freeze([...AWS_IAM_IDENTITY_CENTER.lines]) });
 
 // 0.3 までの設定（AWS プリセットの有効・無効と、追加した URL パターン）を、同じ内容の行に直す。
 // 0.3 までは AWS の対象 URL が最初から有効だったので、保存された設定が無い場合も AWS の行を入れる。
@@ -62,13 +64,12 @@ export async function storeSettings(settings) {
 }
 
 // インストールや更新のあとに、設定をいまの形で保存しておく。対象 URL を減らす変更はしないので、Touch ID は求めない。
-// 設定が保存されていないのは、新規インストールか、0.3 までの版で設定を保存しなかった場合。
-// 0.3 までの版なら AWS のブロックルールが登録されているので、それで見分ける。
-export async function initializeSettings({ hadRulesInstalled }) {
+// 設定が保存されていないのは、新規インストールか、0.3 までの版で設定を保存しなかった場合。どちらも AWS の例の行になる。
+// すでにいまの形で保存されている設定（対象 URL を空にして保存したものを含む）は、書き換えない。
+export async function initializeSettings() {
   const stored = await loadStoredSettings();
   if (isCurrentSettings(stored)) return;
-  const isNewInstall = stored === undefined && !hadRulesInstalled;
-  await storeSettings(isNewInstall ? DEFAULT_SETTINGS : convertLegacySettings(stored));
+  await storeSettings(toSettings(stored));
 }
 
 // 設定が変わったら（別のタブで保存した場合も）callback を呼ぶ。
