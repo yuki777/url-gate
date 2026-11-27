@@ -34,7 +34,15 @@ async function unlockWith(credential) {
   await sendToBackground({ type: 'unlock', assertion, target });
 }
 
-unlockButton.addEventListener('click', async () => {
+// Touch ID のダイアログを閉じたときと時間切れは NotAllowedError になる。異常ではないので、エラーとして記録しない。
+const isDismissed = (error) => error?.name === 'NotAllowedError';
+
+// 自動の呼び出しとボタンが重なっても、Touch ID を出すのは 1 回だけにする。
+let isUnlocking = false;
+
+async function unlock() {
+  if (isUnlocking) return;
+  isUnlocking = true;
   setBusy(true);
   status.textContent = 'Touch ID を待っています…';
   try {
@@ -48,12 +56,41 @@ unlockButton.addEventListener('click', async () => {
     await unlockWith(credential);
     status.textContent = '確認できました。移動します。';
   } catch (error) {
-    console.error('[url-gate] 解除に失敗', error);
-    status.textContent = `開けませんでした: ${error.message}`;
+    if (isDismissed(error)) {
+      status.textContent = 'Touch ID を確認できませんでした。「Touch ID で開く」を押すと、もう一度試せます。';
+    } else {
+      console.error('[url-gate] 解除に失敗', error);
+      status.textContent = `開けませんでした: ${error.message}`;
+    }
   } finally {
+    isUnlocking = false;
     setBusy(false);
   }
-});
+}
+
+unlockButton.addEventListener('click', unlock);
+
+// 対象 URL を開こうとして着いたときだけ、ボタンを押さなくても Touch ID を出す。
+// 戻る・進む、再読み込み、タブの復元で出てきたときは、開こうとした操作ではないので出さない。
+const wasOpenedByNavigation = () => performance.getEntriesByType('navigation')[0]?.type === 'navigate';
+
+// Chrome は、フォーカスの無いページからの WebAuthn の要求を断る。
+// 裏のタブで開いた場合などは、このページにフォーカスが来るまで待つ。
+function whenFocused() {
+  if (document.hasFocus()) return Promise.resolve();
+  return new Promise((resolve) => {
+    window.addEventListener('focus', () => resolve(), { once: true });
+  });
+}
+
+// 自動で出すのは 1 回だけ。閉じたあとや失敗したあとは、ボタンで試してもらう。
+async function unlockAutomatically() {
+  if (!wasOpenedByNavigation()) return;
+  await whenFocused();
+  // 待っている間に登録が消えていたら、ボタンは隠れている。
+  if (unlockButton.hidden) return;
+  await unlock();
+}
 
 // 登録したら、そのまま本人確認をして元の URL へ進む。
 // 登録だけでは解除しない。解除はこれまでどおり、バックグラウンドが発行したチャレンジへの署名を検証してから行う。
@@ -89,15 +126,19 @@ async function initialize() {
     return;
   }
 
-  showButtonsFor(await loadCredential());
-  if (unlockButton.hidden) status.textContent = NOT_REGISTERED_MESSAGE;
+  const credential = await loadCredential();
+  showButtonsFor(credential);
+  if (!credential) status.textContent = NOT_REGISTERED_MESSAGE;
 
   // 設定ページなど別のタブで登録した場合も、ボタンを切り替える。
-  onCredentialChanged((credential) => {
+  onCredentialChanged((changed) => {
     if (unlockButton.disabled) return;
-    showButtonsFor(credential);
-    status.textContent = credential ? '' : NOT_REGISTERED_MESSAGE;
+    showButtonsFor(changed);
+    status.textContent = changed ? '' : NOT_REGISTERED_MESSAGE;
   });
+
+  // 登録は人が始める操作なので、自動で出すのは登録済みのときの本人確認だけにする。
+  if (credential) await unlockAutomatically();
 }
 
 initialize().catch((error) => {
