@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.5.7](https://github.com/yuki777/url-gate/compare/0.5.6...0.5.7) - 2026-11-27
+
+- feat: make the extension and docs English-only, and link to the wiki setup guide by @yuki777 in https://github.com/yuki777/url-gate/pull/25
+
 ## [0.5.6](https://github.com/yuki777/url-gate/compare/0.5.5...0.5.6) - 2026-11-27
 
 - feat: use a domain-style RP ID so that the passkey can also be saved in 1Password by @yuki777 in https://github.com/yuki777/url-gate/pull/22
