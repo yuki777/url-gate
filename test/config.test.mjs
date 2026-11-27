@@ -1,8 +1,31 @@
 // 実行: node --test
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { buildRules, convertLegacySettings, isGatedUrl, isUnlockableUrl, parseLine, parseLines } from '../config.js';
+import { readFile } from 'node:fs/promises';
+import {
+  DEFAULT_SETTINGS,
+  buildRules,
+  convertLegacySettings,
+  initializeSettings,
+  isGatedUrl,
+  isUnlockableUrl,
+  loadSettings,
+  parseLine,
+  parseLines,
+} from '../config.js';
 import { AWS_IAM_IDENTITY_CENTER } from '../presets.js';
+
+// chrome.storage.local の代わり。initial は保存済みの内容。
+function mockStorage(context, initial) {
+  const items = { ...initial };
+  const local = {
+    get: async (key) => (key in items ? { [key]: items[key] } : {}),
+    set: async (values) => void Object.assign(items, values),
+  };
+  globalThis.chrome = { storage: { local } };
+  context.after(() => delete globalThis.chrome);
+  return items;
+}
 
 const rulesOf = (...lines) => buildRules({ lines });
 const blockedByNetwork = (rules, url, { isFrame }) => {
@@ -136,6 +159,36 @@ test('AWS IAM Identity Center の例', () => {
   }
   assert.equal(blockedByNetwork(rules, 'https://portal.sso.us-east-1.amazonaws.com/instance/appinstances', { isFrame: false }), false);
   assert.equal(isUnlockableUrl('https://console.aws.amazon.com/', rules), false);
+});
+
+test('新しくインストールしたときの対象 URL は、AWS IAM Identity Center の例', async (context) => {
+  const items = mockStorage(context, {});
+  assert.deepEqual((await loadSettings()).lines, AWS_IAM_IDENTITY_CENTER.lines);
+  await initializeSettings();
+  assert.deepEqual(items.settings.lines, AWS_IAM_IDENTITY_CENTER.lines);
+  // そのまま保存し直せる（検証で行が変わらない）。
+  assert.deepEqual(parseLines(DEFAULT_SETTINGS.lines), { lines: [...AWS_IAM_IDENTITY_CENTER.lines], errors: [] });
+});
+
+test('保存されている設定は、空でも書き換えない', async (context) => {
+  for (const lines of [[], ['example.com/admin']]) {
+    const items = mockStorage(context, { settings: { lines } });
+    await initializeSettings();
+    assert.deepEqual(items.settings, { lines });
+    assert.deepEqual(await loadSettings(), { lines });
+  }
+});
+
+test('0.3 までの設定は、更新したときにいまの形で保存する', async (context) => {
+  const items = mockStorage(context, { settings: { awsPreset: false, customPatterns: ['example.com'] } });
+  await initializeSettings();
+  assert.deepEqual(items.settings, { lines: ['example.com'] });
+});
+
+test('説明ページに載せた AWS IAM Identity Center の例は、実際に入る行と同じ', async () => {
+  const page = await readFile(new URL('../docs/aws-iam-identity-center.md', import.meta.url), 'utf8');
+  const [, block] = page.match(/```\n([\s\S]*?)\n```/);
+  assert.deepEqual(block.split('\n'), AWS_IAM_IDENTITY_CENTER.lines);
 });
 
 test('0.3 までの設定は、同じ内容の行に直す', () => {

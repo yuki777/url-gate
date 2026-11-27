@@ -128,8 +128,7 @@ function reinstallBlockRules() {
 
 // インストールや更新のあとに、設定をいまの形にそろえ、ブロックルールを作り直す。
 async function prepare() {
-  const existingRules = await chrome.declarativeNetRequest.getDynamicRules();
-  await initializeSettings({ hadRulesInstalled: existingRules.length > 0 });
+  await initializeSettings();
   await reinstallBlockRules();
   await chrome.storage.local.set({ [PREPARED_VERSION_KEY]: EXTENSION_VERSION });
 }
@@ -270,7 +269,7 @@ const MESSAGE_HANDLERS = {
 chrome.runtime.onInstalled.addListener(({ reason }) => {
   prepared = prepared.then(prepare).catch(logError('インストール後の準備に失敗'));
   rulesPromise = null;
-  // インストールしただけでは何も止めないので、最初に設定ページ（Touch ID の登録と対象 URL）を開く。
+  // インストールした直後は Touch ID が未登録なので、最初に設定ページ（Touch ID の登録と対象 URL）を開く。
   if (reason === chrome.runtime.OnInstalledReason.INSTALL) {
     chrome.runtime.openOptionsPage().catch(logError('設定ページを開けませんでした'));
   }
