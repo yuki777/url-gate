@@ -6,17 +6,17 @@ const unlockButton = document.getElementById('unlock');
 const registerButton = document.getElementById('register');
 const status = document.getElementById('status');
 
-const NOT_REGISTERED_MESSAGE = 'Touch ID が未登録です。登録すると、続けて本人確認をして、この URL を開きます。';
+const NOT_REGISTERED_MESSAGE = 'Touch ID is not registered yet. After you register, URL Gate verifies you and opens this URL.';
 
 document.getElementById('target').textContent = target;
 
 async function sendToBackground(message) {
   const response = await chrome.runtime.sendMessage(message);
-  if (!response?.ok) throw new Error(response?.error ?? 'バックグラウンドから応答がありません');
+  if (!response?.ok) throw new Error(response?.error ?? 'No response from the background script');
   return response;
 }
 
-// 登録済みなら「開く」だけ、未登録なら「登録して開く」だけを出す。
+// Show only "Open" when registered, and only "Register and open" when not.
 function showButtonsFor(credential) {
   unlockButton.hidden = !credential;
   registerButton.hidden = Boolean(credential);
@@ -34,33 +34,33 @@ async function unlockWith(credential) {
   await sendToBackground({ type: 'unlock', assertion, target });
 }
 
-// Touch ID のダイアログを閉じたときと時間切れは NotAllowedError になる。異常ではないので、エラーとして記録しない。
+// Closing the Touch ID dialog and timing out both give NotAllowedError. That is not a fault, so it is not logged as an error.
 const isDismissed = (error) => error?.name === 'NotAllowedError';
 
-// 自動の呼び出しとボタンが重なっても、Touch ID を出すのは 1 回だけにする。
+// Even when the automatic call and the button overlap, Touch ID is shown only once.
 let isUnlocking = false;
 
 async function unlock() {
   if (isUnlocking) return;
   isUnlocking = true;
   setBusy(true);
-  status.textContent = 'Touch ID を待っています…';
+  status.textContent = 'Waiting for Touch ID…';
   try {
     const credential = await loadCredential();
-    // 別のタブで登録を消した場合など。未登録は異常ではないので、エラーとして記録しない。
+    // For example the registration was removed in another tab. Not being registered is not a fault, so it is not logged as an error.
     if (!credential) {
       showButtonsFor(null);
       status.textContent = NOT_REGISTERED_MESSAGE;
       return;
     }
     await unlockWith(credential);
-    status.textContent = '確認できました。移動します。';
+    status.textContent = 'Verified. Opening the page…';
   } catch (error) {
     if (isDismissed(error)) {
-      status.textContent = 'Touch ID を確認できませんでした。「Touch ID で開く」を押すと、もう一度試せます。';
+      status.textContent = 'Touch ID was not confirmed. Press "Open with Touch ID" to try again.';
     } else {
-      console.error('[url-gate] 解除に失敗', error);
-      status.textContent = `開けませんでした: ${error.message}`;
+      console.error('[url-gate] Unlock failed', error);
+      status.textContent = `Could not open: ${error.message}`;
     }
   } finally {
     isUnlocking = false;
@@ -70,12 +70,12 @@ async function unlock() {
 
 unlockButton.addEventListener('click', unlock);
 
-// 対象 URL を開こうとして着いたときだけ、ボタンを押さなくても Touch ID を出す。
-// 戻る・進む、再読み込み、タブの復元で出てきたときは、開こうとした操作ではないので出さない。
+// Touch ID is shown without a button press only when this page was reached by trying to open a protected URL.
+// Back/forward, reload and tab restore are not attempts to open it, so nothing is shown then.
 const wasOpenedByNavigation = () => performance.getEntriesByType('navigation')[0]?.type === 'navigate';
 
-// Chrome は、フォーカスの無いページからの WebAuthn の要求を断る。
-// 裏のタブで開いた場合などは、このページにフォーカスが来るまで待つ。
+// Chrome rejects WebAuthn requests from a page without focus.
+// When opened in a background tab, for example, wait until this page gets focus.
 function whenFocused() {
   if (document.hasFocus()) return Promise.resolve();
   return new Promise((resolve) => {
@@ -83,38 +83,38 @@ function whenFocused() {
   });
 }
 
-// 自動で出すのは 1 回だけ。閉じたあとや失敗したあとは、ボタンで試してもらう。
+// Shown automatically only once. After a dismissal or failure, the button is the way to retry.
 async function unlockAutomatically() {
   if (!wasOpenedByNavigation()) return;
   await whenFocused();
-  // 待っている間に登録が消えていたら、ボタンは隠れている。
+  // If the registration was removed while waiting, the button is hidden.
   if (unlockButton.hidden) return;
   await unlock();
 }
 
-// 登録したら、そのまま本人確認をして元の URL へ進む。
-// 登録だけでは解除しない。解除はこれまでどおり、バックグラウンドが発行したチャレンジへの署名を検証してから行う。
+// After registering, go straight on to verification and then to the original URL.
+// Registering alone does not unlock. As always, unlocking happens only after the signature over a challenge issued by the background script is verified.
 registerButton.addEventListener('click', async () => {
   setBusy(true);
-  status.textContent = 'Touch ID を登録しています…';
+  status.textContent = 'Registering Touch ID…';
   let credential;
   try {
     credential = await registerCredential();
   } catch (error) {
-    console.error('[url-gate] 登録に失敗', error);
-    status.textContent = `登録できませんでした: ${error.message}`;
+    console.error('[url-gate] Registration failed', error);
+    status.textContent = `Could not register: ${error.message}`;
     setBusy(false);
     return;
   }
 
   showButtonsFor(credential);
-  status.textContent = '登録しました。続けて Touch ID で本人確認をします…';
+  status.textContent = 'Registered. Now verifying with Touch ID…';
   try {
     await unlockWith(credential);
-    status.textContent = '確認できました。移動します。';
+    status.textContent = 'Verified. Opening the page…';
   } catch (error) {
-    console.error('[url-gate] 登録後の解除に失敗', error);
-    status.textContent = `登録はできましたが、開けませんでした: ${error.message}。「Touch ID で開く」を押してください。`;
+    console.error('[url-gate] Unlock after registration failed', error);
+    status.textContent = `Registered, but could not open: ${error.message}. Press "Open with Touch ID".`;
   } finally {
     setBusy(false);
   }
@@ -122,7 +122,7 @@ registerButton.addEventListener('click', async () => {
 
 async function initialize() {
   if (!isUnlockableUrl(target, await loadRules())) {
-    status.textContent = '遷移先が対象 URL ではないため、開けません。';
+    status.textContent = 'The destination is not a protected URL, so it cannot be opened.';
     return;
   }
 
@@ -130,18 +130,18 @@ async function initialize() {
   showButtonsFor(credential);
   if (!credential) status.textContent = NOT_REGISTERED_MESSAGE;
 
-  // 設定ページなど別のタブで登録した場合も、ボタンを切り替える。
+  // Switch the buttons when registration happens in another tab too, such as the options page.
   onCredentialChanged((changed) => {
     if (unlockButton.disabled) return;
     showButtonsFor(changed);
     status.textContent = changed ? '' : NOT_REGISTERED_MESSAGE;
   });
 
-  // 登録は人が始める操作なので、自動で出すのは登録済みのときの本人確認だけにする。
+  // Registration is something a person starts, so only verification for an existing registration is shown automatically.
   if (credential) await unlockAutomatically();
 }
 
 initialize().catch((error) => {
-  console.error('[url-gate] ゲートページの準備に失敗', error);
-  status.textContent = `登録状態を取得できませんでした: ${error.message}`;
+  console.error('[url-gate] Failed to set up the gate page', error);
+  status.textContent = `Could not read the registration state: ${error.message}`;
 });

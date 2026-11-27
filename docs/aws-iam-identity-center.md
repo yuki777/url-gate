@@ -1,20 +1,20 @@
-# 例: AWS IAM Identity Center
+# Example: AWS IAM Identity Center
 
-新しくインストールすると、この例の行が最初から対象 URL に入っています。AWS access portal のセッションが残っていれば、`aws sso login` の認可画面で「Allow access」を押すだけで認証情報を取得できてしまうのを防ぎます。
+A fresh install starts with the lines of this example as its protected URLs. As long as an AWS access portal session is still there, credentials can be obtained just by pressing "Allow access" on the authorization page of `aws sso login`. These lines prevent that.
 
-設定ページに書けるのと同じ行だけでできているので、自由に書き換えられます。使わなければ、すべて消して保存できます。リージョンとサブドメインは任意です。
+The example consists only of lines that anyone can write on the options page, so you can edit it freely. If you don't use it, delete everything and save. Any region and any subdomain match.
 
-## 入っている行
+## Lines in the example
 
-消したあとで戻したいときは、次の行を設定ページの対象 URL の欄に貼り付けて保存します（[presets.js](../presets.js) と同じ内容です）。
+To bring the lines back after deleting them, paste the following into the protected URLs field on the options page and save (it is the same as [presets.js](../presets.js)).
 
 ```
-# AWS IAM Identity Center: aws sso login の認可画面と、デバイスコードの確認画面
+# AWS IAM Identity Center: the authorization page of aws sso login and the device code confirmation page
 oidc.*.amazonaws.com/authorize
 oidc.*.api.aws/authorize
 device.sso.*.amazonaws.com
 
-# AWS access portal。一覧画面（! の行）だけは Touch ID なしで開ける
+# AWS access portal. Only the list screens (the ! lines) open without Touch ID
 *.awsapps.com/start
 !*.awsapps.com/start
 !*.awsapps.com/start#/
@@ -51,18 +51,18 @@ device.sso.*.amazonaws.com
 !*.*.portal.amazonaws.com/start/#/?tab=accounts
 !*.*.portal.amazonaws.com/start/#/?tab=applications
 
-# 認証情報を取り出す通信と、デバイスコードを承認する通信。画面を移動せずに呼べるので、通信も止める
+# Requests that fetch credentials or approve a device code. They can be called without a navigation, so requests are blocked too
 all:portal.sso.*.amazonaws.com/federation/
 all:portal.sso.*.api.aws/federation/
 all:oidc.*.amazonaws.com/device_authorization/
 all:oidc.*.api.aws/device_authorization/
 ```
 
-## 開く前に必ず Touch ID を求める URL
+## URLs that always require Touch ID before opening
 
-- `oidc.*.amazonaws.com/authorize`（`aws sso login` の認可画面）
+- `oidc.*.amazonaws.com/authorize` (the authorization page of `aws sso login`)
 - `oidc.*.api.aws/authorize`
-- `device.sso.*.amazonaws.com`（デバイスコードの確認画面）
+- `device.sso.*.amazonaws.com` (the device code confirmation page)
 
 ## AWS access portal
 
@@ -70,23 +70,27 @@ all:oidc.*.api.aws/device_authorization/
 - `*.portal.*.app.aws`
 - `*.*.portal.amazonaws.com`
 
-一覧画面（`/start/`、`/start/#/`、`/start/#/?tab=accounts`、`/start/#/?tab=applications`）だけは、例外の行で Touch ID なしで開けるようにしています。それ以外の画面（`/start/#/console` など）は Touch ID を求めます。
+Only the list screens (`/start/`, `/start/#/`, `/start/#/?tab=accounts`, `/start/#/?tab=applications`) open without Touch ID, through the exception lines. Every other screen (such as `/start/#/console`) requires Touch ID.
 
-## 認証情報を取り出す通信
+## Requests that fetch credentials
 
 - `all:portal.sso.*.amazonaws.com/federation/`
 - `all:portal.sso.*.api.aws/federation/`
 - `all:oidc.*.amazonaws.com/device_authorization/`
 - `all:oidc.*.api.aws/device_authorization/`
 
-access portal がコンソールのサインイン URL やアクセスキーを取り出すときの通信と、デバイスコードを承認するときの通信です。画面を移動せずに呼べるので、Touch ID を通したタブ以外では通信そのものを止めます。行頭の `all:` の意味は [詳しい書き方](advanced.md) にあります。
+These are the requests the access portal makes to get a console sign-in URL or access keys, and the requests that approve a device code. They can be called without a navigation, so the requests themselves are blocked in every tab that has not passed Touch ID. The meaning of the leading `all:` is explained in [Advanced syntax](advanced.md).
 
-一覧画面でアクセスキーを表示したいときは、[ツールバーの拡張のボタン](advanced.md#ツールバーのボタン)を押してそのタブを解除します。
+To show access keys on the list screen, press [the extension's toolbar button](advanced.md#the-toolbar-button) to unlock that tab.
 
-## 0.3 までの版から更新した場合
+## Updating from 0.3 or earlier
 
-0.3 までは、AWS の対象 URL が最初から有効でした。更新すると、それまでの設定（AWS の対象 URL と、追加した URL パターン）を同じ内容の行に移し替えるので、そのまま使えます。追加した URL パターンが AWS access portal の一覧画面と重なる場合は、その一覧画面の例外の行を入れません（0.3 までは、追加した URL パターンのほうが優先だったためです）。
+Up to 0.3 the AWS URLs were protected from the start. On update, the earlier settings (the AWS URLs and the URL patterns you added) are converted into equivalent lines, so they keep working. If a URL pattern you added overlaps the list screens of the AWS access portal, the exception lines for those list screens are left out (up to 0.3 the added URL pattern took priority).
 
-## 0.4 から 0.5.3 までの版でインストールした場合
+## Installed with 0.4 to 0.5.3
 
-0.4 から 0.5.3 までは、新しくインストールすると対象 URL は空でした。更新しても、保存されている設定（空のままの場合を含む）は書き換えません。AWS の例を使うときは、[入っている行](#入っている行)を設定ページの対象 URL の欄に貼り付けて保存します。
+From 0.4 to 0.5.3 a fresh install started with no protected URLs. Updating does not rewrite stored settings (including an empty list). To use the AWS example, paste the [lines in the example](#lines-in-the-example) into the protected URLs field on the options page and save.
+
+## Comment lines from 0.5.6 or earlier
+
+Up to 0.5.6 the comment lines of the example were written in Japanese. Updating does not rewrite stored settings, so if your settings contain those comments they stay as they are. They are only comments, and the protection is the same. To switch to the English comments, paste the [lines in the example](#lines-in-the-example) over them and save.

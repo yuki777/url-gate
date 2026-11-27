@@ -1,47 +1,47 @@
-# 詳しい書き方: ページの中からの通信も止める
+# Advanced syntax: also block requests from inside pages
 
-[README](../README.md) の書き方（対象 URL と例外）は、人が画面として開く URL を止めます。このページは、それでは足りない場合の書き方です。
+The syntax in the [README](../README.md) (protected URLs and exceptions) stops URLs that a person opens as a page. This page covers the cases where that is not enough.
 
-## 印のない行で止まらないもの
+## What a plain line does not stop
 
-印のない行が止めるのは、その URL をタブ（または iframe）で開く操作だけです。すでに開いているページの中のスクリプトが、その URL に通信するのは止めません。
+A plain line only stops opening that URL in a tab (or an iframe). It does not stop a script in a page that is already open from sending a request to that URL.
 
-ふつうはこれで足ります。重要な操作は画面を開いて行うもので、開こうとした時点で Touch ID を求められるからです。足りないのは、画面を開かなくても、API を 1 回呼ぶだけでトークンなどが取れてしまう URL です。
+That is normally enough. Important actions happen on a page you open, and Touch ID is requested the moment you try to open it. It falls short for URLs where a single API call, with no page opened, hands out something like a token.
 
-## `all:` を付ける
+## Add `all:`
 
-行頭に `all:` を付けると、ページを開く操作に加えて、ページの中からその URL に送るすべての通信（スクリプトの fetch、画像の読み込みなど）を止めます。
+A line starting with `all:` blocks, in addition to opening the page, every request sent to that URL from inside pages (a script's fetch, image loads, and so on).
 
 ```
-# トークンを発行する API は、ページの中からの通信も止める
+# For an API that issues tokens, block requests from inside pages too
 all:api.example.com/token
 ```
 
-- `all:` を付けた URL への通信は、Touch ID を通したタブからだけ出せます。解除は 2 分で切れます。
-- 対象 URL のページを Touch ID で開いたタブは、そのまま通信できます。解除が切れたあとは、開いたままのページからの通信も止まります。
-- 例外（`!`）が効くのは、ページを開く操作だけです。`all:` で止めている通信は外しません。
+- Requests to a URL with `all:` can only be sent from a tab that has passed Touch ID. The unlock expires after 2 minutes.
+- A tab that opened a protected page with Touch ID can send requests right away. After the unlock expires, requests from a page that is still open are blocked as well.
+- An exception (`!`) only applies to opening a page. It does not unblock requests stopped by `all:`.
 
-## 付ける範囲は絞る
+## Keep the range narrow
 
-`all:` は、Touch ID を通していないタブからの通信をすべて止めます。そのため、Touch ID なしで開けるページ（例外のページ）や、解除が切れたあとも開いたままのページが、その URL を使っていると動かなくなります。
+`all:` blocks every request from a tab that has not passed Touch ID. So a page that opens without Touch ID (an exception page), or a page still open after the unlock expired, stops working if it uses that URL.
 
 ```
 all:example.com
 !example.com/
 ```
 
-この例では、トップページは例外なので開けますが、そのページが読み込む `example.com/style.css` や `example.com/app.js` が止まるので、表示できません。印のない `example.com` なら、トップページはそのまま表示され、ほかのページを開くときだけ Touch ID を求めます。
+In this example the top page is an exception and can be opened, but `example.com/style.css` and `example.com/app.js`, which the page loads, are blocked, so it cannot be displayed. With a plain `example.com`, the top page displays normally and Touch ID is requested only when another page is opened.
 
-人が画面として開く URL は印なしで書き、`all:` は API の URL のように範囲を絞って使います。
+Write the URLs a person opens as a page as plain lines, and use `all:` on a narrow range such as an API URL.
 
-## ツールバーのボタン
+## The toolbar button
 
-ツールバーの拡張のボタンは、ゲートが自動では出ない場面で、自分から Touch ID を通すためのものです。押すと中間ページが出て、Touch ID を通すと同じページに戻り、そのタブを 2 分間解除します。
+The extension's toolbar button lets you pass Touch ID yourself in situations where the gate does not appear on its own. Pressing it shows the gate page; after Touch ID you return to the same page, and that tab is unlocked for 2 minutes.
 
-使うのは、Touch ID なしで開いたページ（例外のページ）や、解除が切れたあとも開いたままのページから、`all:` で止めている通信を送りたいときです。ページの中からの通信は画面が移動しないので、ゲートは出ず、通信が失敗するだけになります。ボタンでそのタブを解除してから、操作をやり直します。
+Use it when a page that opened without Touch ID (an exception page), or a page still open after the unlock expired, needs to send a request that `all:` blocks. A request from inside a page does not navigate, so no gate appears and the request simply fails. Unlock the tab with the button, then try the action again.
 
-ボタンが効くのは、対象 URL か例外に一致するページを開いているタブだけです。関係のないサイトのタブでは何も起きません。
+The button only works in a tab showing a page that matches a protected URL or an exception. It does nothing in a tab showing an unrelated site.
 
-## `all` という名前のホスト
+## A host named `all`
 
-行頭の `all:` は、通信も止める印として読みます。`all` という名前のホスト（社内のサーバーなど）にポートを付けて書きたいときだけ、`http://all:8080` のようにスキームを付けてください。
+A leading `all:` is read as the mark for blocking requests too. Only when you need to write a port on a host named `all` (such as an internal server), add a scheme, as in `http://all:8080`.

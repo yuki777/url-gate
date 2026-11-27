@@ -1,25 +1,25 @@
 import { AWS_IAM_IDENTITY_CENTER } from './presets.js';
 
-// URL の先頭。https://user@host/ のようにユーザー情報を付けても対象から外れないようにする。
+// The start of a URL. Userinfo such as https://user@host/ must not let a URL slip past the match.
 const SCHEME = '^https?://([^/?#@]*@)?';
 
-// Touch ID 通過後、そのタブだけブロックを外しておく時間。
+// How long a tab stays unblocked after Touch ID succeeds.
 export const UNLOCK_MINUTES = 2;
 
-// ---- 設定 ----
+// ---- Settings ----
 
 const SETTINGS_STORAGE_KEY = 'settings';
-// lines は設定ページに書いた行（対象 URL、例外、コメント、空行）。
-// 設定を保存していないときの対象 URL は、AWS IAM Identity Center の例。新しくインストールすると、これが入る。
-// 設定ページに書けるのと同じ行なので、使わなければ消して保存できる。
+// lines holds the lines written on the options page (protected URLs, exceptions, comments, blank lines).
+// When no settings are stored, the protected URLs are the AWS IAM Identity Center example. A fresh install gets these.
+// They are the same kind of lines anyone can write on the options page, so they can be deleted and saved if unused.
 export const DEFAULT_SETTINGS = Object.freeze({ lines: Object.freeze([...AWS_IAM_IDENTITY_CENTER.lines]) });
 
-// 0.3 までの設定（AWS プリセットの有効・無効と、追加した URL パターン）を、同じ内容の行に直す。
-// 0.3 までは AWS の対象 URL が最初から有効だったので、保存された設定が無い場合も AWS の行を入れる。
-// 0.3 までは、追加した URL パターンが AWS の一覧画面の例外より優先だった。いまは例外が優先なので、
-// 追加した URL パターンと重なる例外の行は入れず、Touch ID を求めていたページが外れないようにする。
-// 0.3 までは「all:8080/admin」が all というホストのポート 8080 を指した。いまは行頭の all: が別の意味なので、
-// スキームを付けて、同じ URL を指すようにする（スキームを付けても、http と https の両方が対象になる）。
+// Convert settings from 0.3 and earlier (the AWS preset toggle and the added URL patterns) into equivalent lines.
+// Up to 0.3 the AWS URLs were protected from the start, so the AWS lines are added even when nothing was stored.
+// Up to 0.3 an added URL pattern took priority over the exceptions for the AWS list screens. Exceptions win now,
+// so exception lines that overlap an added URL pattern are left out; pages that required Touch ID keep requiring it.
+// Up to 0.3 "all:8080/admin" meant port 8080 of a host named "all". A leading all: now has another meaning,
+// so a scheme is added to keep pointing at the same URL (with a scheme, both http and https still match).
 const escapeLegacyPattern = (pattern) => (ALL_REQUESTS_PREFIX.test(pattern.trim()) ? `http://${pattern.trim()}` : pattern);
 
 export function convertLegacySettings(stored) {
@@ -58,21 +58,21 @@ export async function loadSettings() {
   return toSettings(await loadStoredSettings());
 }
 
-// 保存は Touch ID を検証したバックグラウンドだけが行う。
+// Only the background script saves, after it has verified Touch ID.
 export async function storeSettings(settings) {
   await chrome.storage.local.set({ [SETTINGS_STORAGE_KEY]: settings });
 }
 
-// インストールや更新のあとに、設定をいまの形で保存しておく。対象 URL を減らす変更はしないので、Touch ID は求めない。
-// 設定が保存されていないのは、新規インストールか、0.3 までの版で設定を保存しなかった場合。どちらも AWS の例の行になる。
-// すでにいまの形で保存されている設定（対象 URL を空にして保存したものを含む）は、書き換えない。
+// After an install or update, store the settings in the current format. This never removes a protected URL, so it does not ask for Touch ID.
+// Nothing is stored after a fresh install, or when settings were never saved in 0.3 or earlier. Both get the AWS example lines.
+// Settings already stored in the current format (including an empty list that was saved) are never rewritten.
 export async function initializeSettings() {
   const stored = await loadStoredSettings();
   if (isCurrentSettings(stored)) return;
   await storeSettings(toSettings(stored));
 }
 
-// 設定が変わったら（別のタブで保存した場合も）callback を呼ぶ。
+// Call the callback whenever the settings change (including a save from another tab).
 export function onSettingsChanged(callback) {
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== 'local' || !(SETTINGS_STORAGE_KEY in changes)) return;
@@ -80,89 +80,89 @@ export function onSettingsChanged(callback) {
   });
 }
 
-// ---- URL パターン ----
+// ---- URL patterns ----
 
 const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const isDefaultPort = (port) => port === '80' || port === '443';
 
-// パス以降を、ブラウザが URL を書き出すときと同じ形にする（日本語などのパーセントエンコード、. や .. の解決）。
-// * は URL の中でそのまま残るので、ワイルドカードの位置は変わらない。
+// Normalize the path and query the way the browser serializes a URL (percent-encoding of non-ASCII characters, resolving . and ..).
+// * is kept as is inside a URL, so the wildcard positions do not move.
 function normalizePath(path) {
-  // new URL(path, base) だと // から始まるパスがホストとして解釈されるので、文字列でつなぐ。
+  // new URL(path, base) would read a path starting with // as a host, so concatenate strings instead.
   const url = new URL(`https://placeholder.invalid${path}`);
   return `${url.pathname}${url.search}`;
 }
 
-// ホスト名の * の代わりに URL の解析へ渡す文字列。Chrome はホスト名の * をエスケープするので、置き換えてから解析する。
+// The string passed to the URL parser in place of * in a hostname. Chrome escapes * in hostnames, so it is replaced before parsing.
 const WILDCARD_LABEL = 'wildcard0x2a';
 const countOf = (text, part) => text.split(part).length - 1;
 
-// ホスト名を、ブラウザが URL を書き出すときと同じ形にする（小文字化、日本語ドメインの punycode 化、
-// 127.1 のような IPv4 の省略形の展開）。
+// Normalize the hostname the way the browser serializes a URL (lowercasing, punycode for internationalized
+// domain names, expanding IPv4 shorthand such as 127.1).
 function normalizeHostname(hostname) {
-  if (/[@[\]\\%]/.test(hostname)) throw new Error('ホスト名に使えない文字があります');
-  if (hostname.toLowerCase().includes(WILDCARD_LABEL)) throw new Error('ホスト名に使えない文字があります');
+  if (/[@[\]\\%]/.test(hostname)) throw new Error('The hostname contains a character that is not allowed');
+  if (hostname.toLowerCase().includes(WILDCARD_LABEL)) throw new Error('The hostname contains a character that is not allowed');
   const replaced = hostname.replaceAll('*', WILDCARD_LABEL);
   let parsed;
   try {
     parsed = new URL(`http://${replaced}`).hostname;
   } catch {
-    throw new Error('ホスト名を解釈できません');
+    throw new Error('The hostname cannot be parsed');
   }
-  // 日本語と * を同じラベルに書くと、punycode 化で * の位置が分からなくなる。
+  // With non-ASCII characters and * in the same label, punycode encoding loses track of where the * was.
   const mixesWithPunycode = parsed.split('.').some((label) => label.startsWith('xn--') && label.includes(WILDCARD_LABEL));
   if (mixesWithPunycode || countOf(parsed, WILDCARD_LABEL) !== countOf(replaced, WILDCARD_LABEL)) {
-    throw new Error('* と日本語は、ドメインの同じ区切り（. と . の間）に書けません');
+    throw new Error('* and non-ASCII characters cannot be in the same part of a domain (between two dots)');
   }
   const normalized = parsed.replaceAll(WILDCARD_LABEL, '*');
-  if (!/^[a-z0-9.*_-]+$/.test(normalized)) throw new Error('ホスト名に使えない文字があります');
-  if (!/[a-z0-9]/.test(normalized)) throw new Error('ホスト名を * だけにはできません');
+  if (!/^[a-z0-9.*_-]+$/.test(normalized)) throw new Error('The hostname contains a character that is not allowed');
+  if (!/[a-z0-9]/.test(normalized)) throw new Error('The hostname cannot consist of * only');
   return normalized;
 }
 
-// 設定ページの 1 行を解釈する。行の種類は 3 つ。
-// - 対象 URL（example.com/admin）: ページを開く操作（画面の遷移と iframe の読み込み）を止める。
-// - 通信も止める対象 URL（all:api.example.com/token）: ページ内のスクリプトからの通信も止める。
-// - 例外（!example.com/admin/help）: 対象 URL のうち、Touch ID なしで開けるページ。
+// Parse one line from the options page. There are three kinds of lines.
+// - Protected URL (example.com/admin): blocks opening the page (navigations and iframe loads).
+// - Protected URL that also blocks requests (all:api.example.com/token): also blocks requests from scripts inside pages.
+// - Exception (!example.com/admin/help): a page within the protected URLs that opens without Touch ID.
 //
-// 対象 URL の書き方:
-// - スキームは書いても書かなくてもよく、http と https の両方が対象になる。
-// - ホストの * はホスト名の一部（例: *.example.com, app-*.example.com）、パスの * は任意の文字列。
-// - パスは前方一致。パスを省くと、そのホストのすべてのページが対象になる。
-// - # 以降は書けない。
-// 例外の書き方は同じだが、パスは完全一致（大文字と小文字も区別する）で、# 以降も書ける。
-// 外す範囲を広げすぎないように、例外は書いたとおりの URL だけに一致させる。
-// 続けて書いた * は 1 つにまとめる。
+// How protected URLs are written:
+// - The scheme is optional; both http and https match either way.
+// - * in the host matches part of a hostname (e.g. *.example.com, app-*.example.com); * in the path matches any string.
+// - The path is a prefix match. Without a path, every page on the host is protected.
+// - A fragment (# and what follows) is not allowed.
+// Exceptions are written the same way, but the path is an exact match (case-sensitive) and a fragment is allowed.
+// To keep the unprotected range from growing too wide, an exception matches only the URL exactly as written.
+// Consecutive * are collapsed into one.
 const EXCEPTION_PREFIX = '!';
-// 「all」というホストのポートを書きたいときは、http://all:8080 のようにスキームを付ける。
+// To write a port on a host named "all", add a scheme, as in http://all:8080.
 const ALL_REQUESTS_PREFIX = /^all:/i;
 const COMMENT_PREFIX = '#';
 
 const isRuleLine = (text) => text !== '' && !text.startsWith(COMMENT_PREFIX);
 
 function parsePattern(text, { allowsFragment }) {
-  if (/\s/.test(text)) throw new Error('空白は使えません');
+  if (/\s/.test(text)) throw new Error('Whitespace is not allowed');
   const withoutScheme = text.replace(/^(\*|https?):\/\//i, '');
   const hostEnd = withoutScheme.search(/[/?#]/);
   const host = hostEnd === -1 ? withoutScheme : withoutScheme.slice(0, hostEnd);
-  // hostEnd が ? や # のとき、ブラウザは / を補うので、パスも / から始める。
+  // When hostEnd is at ? or #, the browser inserts a /, so the path starts with / here too.
   const rest = hostEnd === -1 ? '' : withoutScheme.slice(hostEnd);
   const pathAndFragment = rest === '' || rest.startsWith('/') ? rest : `/${rest}`;
   const fragmentStart = pathAndFragment.indexOf('#');
   const rawPath = fragmentStart === -1 ? pathAndFragment : pathAndFragment.slice(0, fragmentStart);
   const rawFragment = fragmentStart === -1 ? '' : pathAndFragment.slice(fragmentStart);
-  // # 以降は通信の URL に含まれず、ブロックルールで止められない（iframe で読み込めば差し替えも効かない）。
-  if (rawFragment !== '' && !allowsFragment) throw new Error('# 以降（フラグメント）は、例外（! で始まる行）にだけ書けます');
+  // A fragment is not part of the request URL, so block rules cannot stop it (and loading in an iframe bypasses the redirect).
+  if (rawFragment !== '' && !allowsFragment) throw new Error('A fragment (# and what follows) is only allowed in exceptions (lines starting with !)');
 
   const [, rawHostname, rawPort = ''] = host.match(/^(.*?)(?::([0-9]+))?$/);
-  if (rawHostname.includes(':')) throw new Error('ポートの書き方が正しくありません');
-  // 08443 のような書き方も、ブラウザと同じく 8443 にそろえる。
+  if (rawHostname.includes(':')) throw new Error('The port is not written correctly');
+  // A port written like 08443 becomes 8443, as in the browser.
   const portNumber = Number(rawPort);
-  if (rawPort !== '' && (portNumber < 1 || portNumber > 65535)) throw new Error('ポートは 1〜65535 で書いてください');
+  if (rawPort !== '' && (portNumber < 1 || portNumber > 65535)) throw new Error('The port must be between 1 and 65535');
   const port = rawPort === '' ? '' : String(portNumber);
   const hostname = normalizeHostname(rawHostname).replace(/\*+/g, '*');
   const path = rawPath === '' ? '' : normalizePath(rawPath).replace(/\*+/g, '*');
-  // ブラウザは # だけの URL のフラグメントを空として扱うので、それにそろえる。
+  // The browser treats a bare # as an empty fragment, so do the same.
   const fragment = new URL(`https://placeholder.invalid/${rawFragment}`).hash.replace(/\*+/g, '*');
   return { hostname, port, path, fragment };
 }
@@ -178,10 +178,10 @@ export function parseLine(line) {
   return { kind: 'gate', blocksAllRequests, ...pattern };
 }
 
-// ---- ブロックルール用の正規表現（RE2）----
+// ---- Regular expressions for block rules (RE2) ----
 
-// ホスト部の * はホスト名の中だけ（/ ? # : の手前まで）に一致させる。先頭の *. はサブドメインなしにも一致させる。
-// ブラウザは既定のポート（http の 80、https の 443）を URL から省くので、書かれていても省いた URL に一致させる。
+// * in the host matches only within the hostname (up to / ? # :). A leading *. also matches the host without a subdomain.
+// The browser drops default ports (80 for http, 443 for https) from URLs, so a written default port also matches a URL without it.
 function originRegex({ hostname, port }) {
   const hasLeadingWildcard = hostname.startsWith('*.');
   const hostBody = (hasLeadingWildcard ? hostname.slice(2) : hostname).split('*').map(escapeRegex).join('[^/?#:]*');
@@ -190,24 +190,24 @@ function originRegex({ hostname, port }) {
   return `${SCHEME}${hostRegex}${portRegex}`;
 }
 
-// 対象 URL。パスは前方一致。
+// Protected URL. The path is a prefix match.
 function gateToRegex(pattern) {
   const pathRegex = pattern.path === '' ? '([/?#]|$)' : pattern.path.split('*').map(escapeRegex).join('.*');
   return `${originRegex(pattern)}${pathRegex}`;
 }
 
-// 例外でパスを省いたら、トップページ（/）だけを指す。
+// An exception without a path means the top page (/) only.
 const exceptionPath = (pattern) => (pattern.path === '' ? '/' : pattern.path);
 
-// 例外。通信の URL には # 以降が含まれないので、# の手前までの完全一致にする。
+// Exception. Request URLs carry no fragment, so this is an exact match up to the #.
 function exceptionToRegex(pattern) {
   const pathRegex = exceptionPath(pattern).split('*').map(escapeRegex).join('[^#]*');
   return `${originRegex(pattern)}${pathRegex}(#.*)?$`;
 }
 
-// ---- 遷移の判定 ----
+// ---- Matching navigations ----
 
-// * だけを含むパターンとの完全一致。バックトラックは直前の * までに限るので、時間は文字数の積で抑えられる。
+// Exact match against a pattern whose only wildcard is *. Backtracking goes no further than the last *, so the time is bounded by the product of the lengths.
 function matchesGlob(text, glob) {
   let textIndex = 0;
   let globIndex = 0;
@@ -231,7 +231,7 @@ function matchesGlob(text, glob) {
   return globIndex === glob.length;
 }
 
-// 前方一致。* で区切った断片を、左から順にいちばん手前の位置で探す（後ろに何が続いてもよいので、これで足りる）。
+// Prefix match. Looks for the pieces between * from left to right, each at its earliest position (anything may follow, so this is enough).
 function matchesGlobPrefix(text, glob) {
   const [head, ...parts] = glob.split('*');
   if (!text.startsWith(head)) return false;
@@ -252,8 +252,8 @@ function matchesOrigin(url, { hostname, port }) {
   return hostMatches && portMatches;
 }
 
-// ページの操作で長い URL を作れるので、正規表現のバックトラックに頼らず、時間の上限がある方法で比べる。
-// ブロックルール（gateToRegex）と同じ範囲に一致させる。ブロックルールと同じく、大文字と小文字は区別しない。
+// A page can produce very long URLs, so compare with a time-bounded method instead of relying on regex backtracking.
+// Matches the same range as the block rule (gateToRegex) and, like the block rule, ignores case.
 function gateMatcher(pattern) {
   const lowerPath = pattern.path.toLowerCase();
   return (urlText) => {
@@ -262,8 +262,8 @@ function gateMatcher(pattern) {
   };
 }
 
-// 例外は # 以降まで含めた完全一致。# 以降を書いていない例外は、# 以降の無い URL だけに一致する。
-// # 以降が無い URL も「#」として比べるので、「#*」と書けば # 以降の有無にかかわらず一致する。
+// An exception is an exact match including the fragment. An exception written without a fragment matches only URLs without one.
+// A URL without a fragment is compared as "#", so writing "#*" matches with or without a fragment.
 function exceptionMatcher(pattern) {
   const path = exceptionPath(pattern);
   const fragment = pattern.fragment || '#';
@@ -277,7 +277,7 @@ function exceptionMatcher(pattern) {
   };
 }
 
-// * を含むパターンどうしで、両方に一致する文字列があるか。
+// Whether some string matches both of two patterns that contain *.
 function globsIntersect(first, second) {
   const memo = new Map();
   const visit = (firstIndex, secondIndex) => {
@@ -301,10 +301,10 @@ function globsIntersect(first, second) {
   return visit(0, 0);
 }
 
-// 先頭の *. はサブドメインなしにも一致するので、その形も比べる。
+// A leading *. also matches the host without a subdomain, so compare that form too.
 const hostnameForms = (hostname) => (hostname.startsWith('*.') ? [hostname, hostname.slice(2)] : [hostname]);
 
-// 対象 URL と例外の両方に一致する URL がありうるか。対象 URL は # 以降を見ないので、# 以降は比べない。
+// Whether some URL can match both a protected URL and an exception. Protected URLs ignore the fragment, so it is not compared.
 function gateOverlapsException(gate, exception) {
   const hostsOverlap = hostnameForms(gate.hostname).some((gateHost) =>
     hostnameForms(exception.hostname).some((exceptionHost) => globsIntersect(gateHost, exceptionHost)),
@@ -315,14 +315,14 @@ function gateOverlapsException(gate, exception) {
   return hostsOverlap && portsOverlap && pathsOverlap;
 }
 
-// ---- 設定ページの入力 ----
+// ---- Options page input ----
 
-// 設定ページの入力（1 行に 1 つ）を検証する。重複した行は除く。コメントと空行は、読みやすさのために残す。
+// Validate the options page input (one entry per line). Duplicate lines are dropped. Comments and blank lines are kept for readability.
 export function parseLines(lines) {
   const kept = [];
   const errors = [];
   for (const line of lines) {
-    if (typeof line !== 'string') throw new Error('設定の形式が不正です');
+    if (typeof line !== 'string') throw new Error('The settings format is invalid');
     const text = line.trim();
     if (isRuleLine(text)) {
       if (kept.includes(text)) continue;
@@ -333,7 +333,7 @@ export function parseLines(lines) {
         continue;
       }
     }
-    // 空行は続けて残さない。
+    // Do not keep consecutive blank lines.
     if (text === '' && (kept.length === 0 || kept.at(-1) === '')) continue;
     kept.push(text);
   }
@@ -341,12 +341,12 @@ export function parseLines(lines) {
   return { lines: kept, errors };
 }
 
-// ---- 判定 ----
+// ---- Rules ----
 
-// 設定から、対象 URL と例外の一覧を作る。
-// - gates: Touch ID を通すまで開けない URL。blocksAllRequests が true なら、ページ内の通信も止める。
-// - exceptions: gates のうち、Touch ID なしで開けるページ。
-// pattern はブロックルール用の正規表現、test は遷移の判定用。
+// Build the lists of protected URLs and exceptions from the settings.
+// - gates: URLs that cannot be opened until Touch ID succeeds. With blocksAllRequests, requests from inside pages are blocked too.
+// - exceptions: pages within gates that open without Touch ID.
+// pattern is the regular expression for the block rule; test is for matching navigations.
 export function buildRules(settings) {
   const gates = [];
   const exceptions = [];
@@ -355,8 +355,8 @@ export function buildRules(settings) {
     try {
       parsed = parseLine(line);
     } catch (error) {
-      // 保存時に確かめているので、通常はここには来ない。1 行のために全体を止めないよう、その行だけ飛ばす。
-      console.error(`[url-gate] 解釈できない行を無視します: ${line}`, error);
+      // Lines are validated on save, so this is not normally reached. Skip just this line rather than stopping everything.
+      console.error(`[url-gate] Ignoring a line that cannot be parsed: ${line}`, error);
       continue;
     }
     const label = line.trim();
@@ -375,12 +375,12 @@ export async function loadRules() {
 
 const matchesAny = (entries, urlText) => entries.some((entry) => entry.test(urlText));
 
-// Touch ID を通したタブで開いてよい URL（例外のページを含む）。ゲートページの遷移先として受け付ける範囲でもある。
+// URLs a tab may open after Touch ID (including exception pages). This is also the range the gate page accepts as a destination.
 export function isUnlockableUrl(urlText, rules) {
   return URL.canParse(urlText) && matchesAny(rules.gates, urlText);
 }
 
-// Touch ID を通すまで開けない URL。
+// URLs that cannot be opened until Touch ID succeeds.
 export function isGatedUrl(urlText, rules) {
   return isUnlockableUrl(urlText, rules) && !matchesAny(rules.exceptions, urlText);
 }

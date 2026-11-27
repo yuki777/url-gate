@@ -9,7 +9,7 @@ permissions:
   pull-requests: write
   issues: read
 
-# 第三者の action は可変のタグではなく、コミット SHA で固定する。
+# Third-party actions are pinned to a commit SHA, not a mutable tag.
 jobs:
   tagpr:
     runs-on: ubuntu-latest
@@ -21,8 +21,8 @@ jobs:
         uses: Songmu/tagpr@047aec4b6c0ce166f52958b5a97f5a3d927fd65b # v1.22.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # リリースを作ったときだけ、Chrome Web Store に提出する zip を GitHub Release に付ける。
-      - name: 提出用の zip を GitHub Release に付ける
+      # Only when a release was created, attach the zip for the Chrome Web Store to the GitHub Release.
+      - name: Attach the store zip to the GitHub Release
         if: steps.tagpr.outputs.tag != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

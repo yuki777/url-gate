@@ -1,33 +1,34 @@
 <!doctype html>
-<html lang="ja">
+<html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>URL Gate の設定</title>
+  <title>URL Gate Options</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <main>
     <h1>URL Gate</h1>
     <p id="state"></p>
-    <button id="register" type="button">Touch ID を登録する</button>
+    <button id="register" type="button">Register Touch ID</button>
     <p id="status" role="status"></p>
+    <p>First time here? The <a href="https://github.com/yuki777/url-gate/wiki/Getting-Started" target="_blank" rel="noopener noreferrer">setup guide</a> walks through the registration dialogs.</p>
 
-    <h2>対象 URL</h2>
-    <p>ここに書いた URL を開く前に、Touch ID を求めます。保存にも Touch ID が必要です。</p>
+    <h2>Protected URLs</h2>
+    <p>URL Gate asks for Touch ID before opening the URLs listed here. Saving also requires Touch ID.</p>
 
-    <label for="lines">対象 URL（1 行に 1 つ）</label>
+    <label for="lines">Protected URLs (one per line)</label>
     <textarea id="lines" class="url" rows="16" spellcheck="false"
       placeholder="example.com/admin&#10;!example.com/admin/help"></textarea>
 
-    <h3>URL の書き方</h3>
+    <h3>How to write URLs</h3>
     <ul class="hint">
-      <li><code>example.com/admin</code>: このページと、その先のページを開く前に、Touch ID を求めます。</li>
-      <li><code>!example.com/admin/help</code>: 行頭に <code>!</code> を付けると例外で、Touch ID なしで開けます。</li>
-      <li><code>*</code> は任意の文字列に一致します（<code>*.example.com</code>）。<code>#</code> で始まる行はコメントです。</li>
+      <li><code>example.com/admin</code>: asks for Touch ID before opening this page and the pages under it.</li>
+      <li><code>!example.com/admin/help</code>: a line starting with <code>!</code> is an exception, which opens without Touch ID.</li>
+      <li><code>*</code> matches any string (<code>*.example.com</code>). Lines starting with <code>#</code> are comments.</li>
     </ul>
-    <p class="hint">ほかの書き方は、<a href="https://github.com/yuki777/url-gate#対象-url-の設定" target="_blank" rel="noopener noreferrer">詳しい書き方</a>にあります。</p>
+    <p class="hint">For everything else you can write, see the <a href="https://github.com/yuki777/url-gate#protected-urls" target="_blank" rel="noopener noreferrer">full syntax</a>.</p>
 
-    <button id="save" type="button">Touch ID で保存する</button>
+    <button id="save" type="button">Save with Touch ID</button>
     <p id="settings-status" role="status"></p>
   </main>
   <script type="module" src="options.js"></script>
