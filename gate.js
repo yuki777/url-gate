@@ -1,14 +1,39 @@
-import { isUnlockableUrl, loadRules } from './config.js';
+import { UNLOCK_MINUTES, isUnlockableUrl, loadRules } from './config.js';
 import { loadCredential, onCredentialChanged, registerCredential, requestAssertion } from './webauthn.js';
 
-const target = new URLSearchParams(location.search).get('target') ?? '';
+const parameters = new URLSearchParams(location.search);
+const target = parameters.get('target') ?? '';
+// Set when the toolbar button opened this page: the tab to unlock. The page in that tab stays open, and this tab closes afterwards.
+const tabToUnlock = parameters.has('tab') ? Number(parameters.get('tab')) : undefined;
+const unlocksOtherTab = tabToUnlock !== undefined;
 const unlockButton = document.getElementById('unlock');
 const registerButton = document.getElementById('register');
 const status = document.getElementById('status');
 
-const NOT_REGISTERED_MESSAGE = 'Touch ID is not registered yet. After you register, URL Gate verifies you and opens this URL.';
+const TEXT = unlocksOtherTab
+  ? {
+      description: `URL Gate is blocking requests from the following page. After you verify with Touch ID, they are allowed in its tab for ${UNLOCK_MINUTES} minutes and you return to the page.`,
+      unlock: 'Unlock with Touch ID',
+      register: 'Register Touch ID and unlock',
+      notRegistered: 'Touch ID is not registered yet. After you register, URL Gate verifies you and unlocks the page.',
+      verified: 'Verified. Returning to the page…',
+      failed: 'Could not unlock',
+      failedAfterRegistering: 'Registered, but could not unlock',
+    }
+  : {
+      unlock: 'Open with Touch ID',
+      notRegistered: 'Touch ID is not registered yet. After you register, URL Gate verifies you and opens this URL.',
+      verified: 'Verified. Opening the page…',
+      failed: 'Could not open',
+      failedAfterRegistering: 'Registered, but could not open',
+    };
 
 document.getElementById('target').textContent = target;
+if (unlocksOtherTab) {
+  document.getElementById('description').textContent = TEXT.description;
+  unlockButton.textContent = TEXT.unlock;
+  registerButton.textContent = TEXT.register;
+}
 
 async function sendToBackground(message) {
   const response = await chrome.runtime.sendMessage(message);
@@ -31,7 +56,14 @@ function setBusy(isBusy) {
 async function unlockWith(credential) {
   const { challenge } = await sendToBackground({ type: 'challenge' });
   const assertion = await requestAssertion(credential, challenge);
-  await sendToBackground({ type: 'unlock', assertion, target });
+  await sendToBackground({ type: 'unlock', assertion, target, tab: tabToUnlock });
+  if (unlocksOtherTab) await closeThisTab();
+}
+
+// The background script has already switched back to the unlocked tab.
+async function closeThisTab() {
+  const thisTab = await chrome.tabs.getCurrent();
+  await chrome.tabs.remove(thisTab.id);
 }
 
 // Closing the Touch ID dialog and timing out both give NotAllowedError. That is not a fault, so it is not logged as an error.
@@ -50,17 +82,17 @@ async function unlock() {
     // For example the registration was removed in another tab. Not being registered is not a fault, so it is not logged as an error.
     if (!credential) {
       showButtonsFor(null);
-      status.textContent = NOT_REGISTERED_MESSAGE;
+      status.textContent = TEXT.notRegistered;
       return;
     }
     await unlockWith(credential);
-    status.textContent = 'Verified. Opening the page…';
+    status.textContent = TEXT.verified;
   } catch (error) {
     if (isDismissed(error)) {
-      status.textContent = 'Touch ID was not confirmed. Press "Open with Touch ID" to try again.';
+      status.textContent = `Touch ID was not confirmed. Press "${TEXT.unlock}" to try again.`;
     } else {
       console.error('[url-gate] Unlock failed', error);
-      status.textContent = `Could not open: ${error.message}`;
+      status.textContent = `${TEXT.failed}: ${error.message}`;
     }
   } finally {
     isUnlocking = false;
@@ -111,10 +143,10 @@ registerButton.addEventListener('click', async () => {
   status.textContent = 'Registered. Now verifying with Touch ID…';
   try {
     await unlockWith(credential);
-    status.textContent = 'Verified. Opening the page…';
+    status.textContent = TEXT.verified;
   } catch (error) {
     console.error('[url-gate] Unlock after registration failed', error);
-    status.textContent = `Registered, but could not open: ${error.message}. Press "Open with Touch ID".`;
+    status.textContent = `${TEXT.failedAfterRegistering}: ${error.message}. Press "${TEXT.unlock}".`;
   } finally {
     setBusy(false);
   }
@@ -128,13 +160,13 @@ async function initialize() {
 
   const credential = await loadCredential();
   showButtonsFor(credential);
-  if (!credential) status.textContent = NOT_REGISTERED_MESSAGE;
+  if (!credential) status.textContent = TEXT.notRegistered;
 
   // Switch the buttons when registration happens in another tab too, such as the options page.
   onCredentialChanged((changed) => {
     if (unlockButton.disabled) return;
     showButtonsFor(changed);
-    status.textContent = changed ? '' : NOT_REGISTERED_MESSAGE;
+    status.textContent = changed ? '' : TEXT.notRegistered;
   });
 
   // Registration is something a person starts, so only verification for an existing registration is shown automatically.

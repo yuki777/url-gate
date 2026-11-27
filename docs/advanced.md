@@ -36,11 +36,20 @@ Write the URLs a person opens as a page as plain lines, and use `all:` on a narr
 
 ## The toolbar button
 
-The extension's toolbar button lets you pass Touch ID yourself in situations where the gate does not appear on its own. Pressing it shows the gate page; after Touch ID you return to the same page, and that tab is unlocked for 2 minutes.
+The extension's toolbar button lets you pass Touch ID yourself in situations where the gate does not appear on its own. Pin it to the toolbar (the puzzle icon → the pin next to URL Gate) so that you can see it.
 
-Use it when a page that opened without Touch ID (an exception page), or a page still open after the unlock expired, needs to send a request that `all:` blocks. A request from inside a page does not navigate, so no gate appears and the request simply fails. Unlock the tab with the button, then try the action again.
+Use it when a page that opened without Touch ID (an exception page), or a page still open after the unlock expired, needs to send a request that `all:` blocks. A request from inside a page does not navigate, so no gate appears and the request simply fails. The page usually reports it as a network error. URL Gate cannot see such a request and cannot show Touch ID for it on its own.
 
-The button only works in a tab showing a page that matches a protected URL or an exception. It does nothing in a tab showing an unrelated site.
+1. The button shows a number: how many requests URL Gate has blocked in this tab since the page loaded. That number is the sign that the failure came from URL Gate.
+2. Press the button. The gate page opens in a new tab and shows Touch ID.
+3. After Touch ID the gate tab closes and you are back on the page, which was not reloaded. Its tab is unlocked for 2 minutes and the button shows ✓ during that time.
+4. Try the action again (for example with the page's retry button).
+
+Passing Touch ID in one tab does not unlock any other tab. If you opened a protected page in another tab a moment ago, the page in this tab is still blocked until you press the button here.
+
+Requests that already failed are not sent again. If the page does not recover by itself, reload it while the tab is unlocked.
+
+The button only works in a tab showing a page that matches a protected URL or an exception. It does nothing in a tab showing an unrelated site, or in a tab that is already unlocked.
 
 ## A host named `all`
 

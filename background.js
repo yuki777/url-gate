@@ -33,13 +33,17 @@ const LEGACY_RP_IDS = [EXTENSION_ORIGIN, chrome.runtime.id];
 
 const challengeKey = (tabId) => `challenge:${tabId}`;
 const unlockExpiryKey = (tabId) => `unlockExpiresAt:${tabId}`;
+// A toolbar button press that is waiting for Touch ID, keyed by the tab it will unlock.
+const unlockRequestKey = (tabId) => `unlockRequest:${tabId}`;
+// Shown on the toolbar button while the tab is unlocked, in place of the number of blocked requests.
+const UNLOCKED_BADGE_TEXT = '✓';
 
 const PREPARED_VERSION_KEY = 'preparedVersion';
 const EXTENSION_VERSION = chrome.runtime.getManifest().version;
 
 const logError = (context) => (error) => console.error(`[url-gate] ${context}`, error);
 
-// installQueue already logs failures, so they are swallowed here.
+// For failures that are already logged elsewhere (installQueue) or that do not matter (a badge on a closed tab).
 const ignoreError = () => {};
 
 // The maximum number of regex rules Chrome accepts.
@@ -132,6 +136,8 @@ function reinstallBlockRules() {
 async function prepare() {
   await initializeSettings();
   await reinstallBlockRules();
+  // A request blocked inside a page fails without any gate. The number on the toolbar button is the only sign of it.
+  await chrome.declarativeNetRequest.setExtensionActionOptions({ displayActionCountAsBadgeText: true });
   await chrome.storage.local.set({ [PREPARED_VERSION_KEY]: EXTENSION_VERSION });
 }
 
@@ -159,6 +165,17 @@ async function isTabUnlocked(tabId) {
   return false;
 }
 
+// The badge of a tab replaces the number of blocked requests. Chrome drops it when the tab loads another page.
+// The badge is only a sign, so a failure to set it (the tab may already be closed) never stops an unlock or a relock.
+async function showUnlockedBadge(tabId) {
+  await chrome.action.setBadgeText({ tabId, text: UNLOCKED_BADGE_TEXT }).catch(ignoreError);
+}
+
+// Without text the tab goes back to showing the number of blocked requests.
+async function clearUnlockedBadge(tabId) {
+  await chrome.action.setBadgeText({ tabId }).catch(ignoreError);
+}
+
 // Unlocking is a per-tab session rule (rule ID = tab ID). Sign-in flows cross hosts, so it is not narrowed by URL.
 // The allow only cancels this extension's own blocks, so URLs that are not protected are unaffected.
 async function unlockTab(tabId) {
@@ -180,12 +197,14 @@ async function unlockTab(tabId) {
     [unlockExpiryKey(tabId)]: Date.now() + UNLOCK_MINUTES * MILLISECONDS_PER_MINUTE,
   });
   await chrome.alarms.create(`${RELOCK_ALARM_PREFIX}${tabId}`, { delayInMinutes: UNLOCK_MINUTES });
+  await showUnlockedBadge(tabId);
 }
 
 async function relockTab(tabId) {
   await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: [tabId] });
   await chrome.storage.session.remove(unlockExpiryKey(tabId));
   await chrome.alarms.clear(`${RELOCK_ALARM_PREFIX}${tabId}`);
+  await clearUnlockedBadge(tabId);
 }
 
 async function showGate(tabId, targetUrl) {
@@ -200,10 +219,49 @@ async function redirectToGate(details) {
   await showGate(details.tabId, details.url);
 }
 
-// The toolbar button. Unlocks the current tab, for example to use blocked requests while staying on an exception page.
+async function refreshUnlockedBadge(details) {
+  if (details.frameId !== 0 || !(await isTabUnlocked(details.tabId))) return;
+  await showUnlockedBadge(details.tabId);
+}
+
+const tabExists = (tabId) => chrome.tabs.get(tabId).then(
+  () => true,
+  () => false,
+);
+
+// The toolbar button. Unlocks the current tab so that a page already open (an exception page, or a page still open
+// after the unlock expired) can send blocked requests. The gate page opens in a tab of its own, so the page is not
+// reloaded and what is on it (an open dialog, a filled form) stays.
 async function showGateForCurrentPage(tab) {
   if (tab.id === undefined || !isUnlockableUrl(tab.url ?? '', await getRules())) return;
-  await showGate(tab.id, tab.url);
+  if (await isTabUnlocked(tab.id)) return;
+
+  // A second press goes back to the gate page that is already waiting, instead of opening another one.
+  const key = unlockRequestKey(tab.id);
+  const pending = (await chrome.storage.session.get(key))[key];
+  if (pending?.gateTabId !== undefined && (await tabExists(pending.gateTabId))) {
+    await chrome.tabs.update(pending.gateTabId, { active: true });
+    return;
+  }
+
+  // Stored before the gate page opens, so the request is there by the time the gate page asks to unlock.
+  await chrome.storage.session.set({ [key]: { url: tab.url } });
+  const gateTab = await chrome.tabs.create({
+    url: `${GATE_PAGE_URL}?target=${encodeURIComponent(tab.url)}&tab=${tab.id}`,
+    openerTabId: tab.id,
+    index: tab.index + 1,
+    windowId: tab.windowId,
+  });
+  await chrome.storage.session.set({ [key]: { url: tab.url, gateTabId: gateTab.id } });
+}
+
+// The gate page names the tab to unlock, so the name is accepted only when the toolbar button was pressed in that
+// tab, for the URL that the gate page showed to the person.
+async function assertUnlockRequested(tabId, target) {
+  const key = unlockRequestKey(tabId);
+  const pending = Number.isInteger(tabId) ? (await chrome.storage.session.get(key))[key] : undefined;
+  if (pending?.url !== target) throw new Error('The toolbar button was not pressed for this page');
+  if (!(await tabExists(tabId))) throw new Error('The page to unlock is no longer open');
 }
 
 async function issueChallenge(_message, tabId) {
@@ -235,9 +293,21 @@ async function verifyTouchId(assertion, tabId) {
 
 async function unlockWithAssertion(message, tabId) {
   if (!isUnlockableUrl(message.target, await getRules())) throw new Error('The destination is not a protected URL');
+  if (message.tab !== undefined) return unlockOtherTabWithAssertion(message, tabId);
   await verifyTouchId(message.assertion, tabId);
   await unlockTab(tabId);
   await chrome.tabs.update(tabId, { url: message.target });
+  return {};
+}
+
+// From the gate page that the toolbar button opened. Unlocks the tab the button was pressed in and returns to it.
+// The gate page closes itself when it gets the response.
+async function unlockOtherTabWithAssertion(message, gateTabId) {
+  await assertUnlockRequested(message.tab, message.target);
+  await verifyTouchId(message.assertion, gateTabId);
+  await chrome.storage.session.remove(unlockRequestKey(message.tab));
+  await unlockTab(message.tab);
+  await chrome.tabs.update(message.tab, { active: true });
   return {};
 }
 
@@ -296,6 +366,11 @@ for (const navigationEvent of NAVIGATION_EVENTS) {
   }, WATCHED_NAVIGATIONS);
 }
 
+// Chrome drops a tab's badge when the tab loads another page, so it is shown again while the tab is still unlocked.
+chrome.webNavigation.onCommitted.addListener((details) => {
+  refreshUnlockedBadge(details).catch(logError('Failed to show the unlocked badge'));
+}, WATCHED_NAVIGATIONS);
+
 chrome.action.onClicked.addListener((tab) => {
   showGateForCurrentPage(tab).catch(logError('Failed to show the gate page'));
 });
@@ -325,4 +400,5 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   relockTab(tabId).catch(logError('Failed to relock on tab close'));
+  chrome.storage.session.remove(unlockRequestKey(tabId)).catch(logError('Failed to forget the unlock request'));
 });
