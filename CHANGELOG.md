@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.5.3](https://github.com/yuki777/url-gate/compare/0.5.2...0.5.3) - 2026-11-27
+
+- feat: 中間ページを開いたら、ボタンを押さなくても Touch ID を出す by @yuki777 in https://github.com/yuki777/url-gate/pull/16
+
 ## [0.5.2](https://github.com/yuki777/url-gate/compare/0.5.1...0.5.2) - 2026-11-14
 
 - docs: README をシンプルにし、all: と AWS の例を別ページに分ける by @yuki777 in https://github.com/yuki777/url-gate/pull/14
