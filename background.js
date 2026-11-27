@@ -229,6 +229,15 @@ const tabExists = (tabId) => chrome.tabs.get(tabId).then(
   () => false,
 );
 
+const gateUrlForTab = (tabId, url) => `${GATE_PAGE_URL}?target=${encodeURIComponent(url)}&tab=${tabId}`;
+
+// Whether the tab still shows that gate page. The person may have closed it, or used the tab for something else.
+// The URL of a tab is readable here only for the extension's own pages, which is all that is compared.
+async function showsGatePage(gateTabId, gateUrl) {
+  const gateTab = await chrome.tabs.get(gateTabId).catch(() => null);
+  return gateTab !== null && (gateTab.url || gateTab.pendingUrl) === gateUrl;
+}
+
 // The toolbar button. Unlocks the current tab so that a page already open (an exception page, or a page still open
 // after the unlock expired) can send blocked requests. The gate page opens in a tab of its own, so the page is not
 // reloaded and what is on it (an open dialog, a filled form) stays.
@@ -238,8 +247,9 @@ async function showGateForCurrentPage(tab) {
 
   // A second press goes back to the gate page that is already waiting, instead of opening another one.
   const key = unlockRequestKey(tab.id);
+  const gateUrl = gateUrlForTab(tab.id, tab.url);
   const pending = (await chrome.storage.session.get(key))[key];
-  if (pending?.gateTabId !== undefined && (await tabExists(pending.gateTabId))) {
+  if (pending?.url === tab.url && pending.gateTabId !== undefined && (await showsGatePage(pending.gateTabId, gateUrl))) {
     await chrome.tabs.update(pending.gateTabId, { active: true });
     return;
   }
@@ -247,7 +257,7 @@ async function showGateForCurrentPage(tab) {
   // Stored before the gate page opens, so the request is there by the time the gate page asks to unlock.
   await chrome.storage.session.set({ [key]: { url: tab.url } });
   const gateTab = await chrome.tabs.create({
-    url: `${GATE_PAGE_URL}?target=${encodeURIComponent(tab.url)}&tab=${tab.id}`,
+    url: gateUrl,
     openerTabId: tab.id,
     index: tab.index + 1,
     windowId: tab.windowId,
