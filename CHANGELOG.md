@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.5.4](https://github.com/yuki777/url-gate/compare/0.5.3...0.5.4) - 2026-11-27
+
+- feat: AWS IAM Identity Center の例を最初から対象 URL に入れ、設定ページの説明を短くする by @yuki777 in https://github.com/yuki777/url-gate/pull/18
+
 ## [0.5.3](https://github.com/yuki777/url-gate/compare/0.5.2...0.5.3) - 2026-11-27
 
 - feat: 中間ページを開いたら、ボタンを押さなくても Touch ID を出す by @yuki777 in https://github.com/yuki777/url-gate/pull/16
