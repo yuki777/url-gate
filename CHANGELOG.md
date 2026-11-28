@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.5.9](https://github.com/yuki777/url-gate/compare/0.5.8...0.5.9) - 2026-11-28
+
+- docs: add the Chrome Web Store link and store install steps to the README by @yuki777 in https://github.com/yuki777/url-gate/pull/29
+
 ## [0.5.8](https://github.com/yuki777/url-gate/compare/0.5.7...0.5.8) - 2026-11-27
 
 - feat: show blocked requests on the toolbar button, and unlock a tab from it without reloading the page by @yuki777 in https://github.com/yuki777/url-gate/pull/27
