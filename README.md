@@ -2,6 +2,8 @@
 
 A Chrome extension that asks for Touch ID before opening the URLs you choose.
 
+**[Install URL Gate from the Chrome Web Store](https://chromewebstore.google.com/detail/url-gate/kfbipknhomicdibklelfgeolopgpnohg)**
+
 An AI agent that can drive your browser can do important things just by pressing a button on an admin or authorization page, as long as a signed-in session is still there. URL Gate replaces a navigation to a protected URL with a gate page, and nothing goes further until a person passes Touch ID.
 
 You write the protected URLs yourself on the options page. There is no service-specific logic. Lines for AWS IAM Identity Center (formerly AWS SSO) are included from the start as an example ([AWS IAM Identity Center example](docs/aws-iam-identity-center.md)). If you don't use it, delete the lines on the options page and save.
@@ -72,13 +74,26 @@ Everything above is about URLs that a person opens as a page. To also block requ
 
 You need Chrome 122 or later (or another Chromium-based browser) and a Mac with Touch ID. The [setup guide](https://github.com/yuki777/url-gate/wiki/Getting-Started) shows each step with screenshots.
 
+1. Open [URL Gate in the Chrome Web Store](https://chromewebstore.google.com/detail/url-gate/kfbipknhomicdibklelfgeolopgpnohg) and press "Add to Chrome".
+2. The options page opens after installation. Press "Register Touch ID" there (to open it later, go to the extension's "Details" → "Extension options").
+3. The protected URLs start with the AWS IAM Identity Center example. On the same page, replace it with the URLs you want to protect and save.
+
+Chrome keeps the extension up to date by itself. Each version is reviewed by the store before it is published, so the store can be a version or two behind the [latest release](https://github.com/yuki777/url-gate/releases/latest).
+
+### Install from source
+
+To run the code in this repository as it is, for example to try a change, load it as an unpacked extension instead.
+
 1. Clone this repository, or download it as a zip and extract it.
 2. Open `chrome://extensions` and turn on "Developer mode".
 3. Press "Load unpacked" and choose this folder.
-4. The options page opens after installation. Press "Register Touch ID" there (to open it later, go to the extension's "Details" → "Extension options").
-5. The protected URLs start with the AWS IAM Identity Center example. On the same page, replace it with the URLs you want to protect and save.
+4. Register Touch ID and set the protected URLs on the options page, as in steps 2 and 3 above.
 
 To update, replace the files with the new ones and press the reload button for this extension on `chrome://extensions`.
+
+Chrome treats the unpacked extension and the store version as two separate extensions, each with its own Touch ID registration and protected URLs. Keep only one of them enabled. To move from one to the other, copy the protected URLs from the old options page, remove the old extension, install the other one, register Touch ID again, then paste the protected URLs and save.
+
+### Registration
 
 If you open a protected URL before registering, the gate page shows "Register Touch ID and open". Pressing it registers, then verifies you with Touch ID, and continues to the original URL (Touch ID is requested twice, once to register and once to verify).
 
@@ -112,7 +127,7 @@ If you need a firm guarantee, combine URL Gate with settings on the service itse
 
 | File | Role |
 |---|---|
-| `manifest.json` | The extension manifest. `key` is the public key that pins the extension ID |
+| `manifest.json` | The extension manifest. `key` is the public key that pins the ID of the unpacked extension (the store version has its own ID) |
 | `config.js` | Parsing of the settings lines (protected URLs, exceptions), reading and writing settings, the unlock duration |
 | `presets.js` | The example the protected URLs start with (AWS IAM Identity Center) |
 | `background.js` | Registering block rules, redirecting to the gate page, verifying signatures, per-tab unlock, saving settings |
@@ -128,7 +143,7 @@ The extension makes no network requests of its own. The registered public key an
 
 ## Releases
 
-Releases use [tagpr](https://github.com/Songmu/tagpr). A push to main creates a release PR that bumps `version` in `manifest.json` and updates `CHANGELOG.md`. Merging that release PR creates the tag and the GitHub Release, and attaches the zip for the Chrome Web Store (`url-gate-<version>.zip`) to the GitHub Release. The zip leaves out the files the extension does not need at runtime and the `key` in `manifest.json`. The default bump is a patch. Add a `tagpr:minor` / `tagpr:major` label to the release PR, or a `minor` / `major` label to a PR included in the release, to change it. Editing `version` in `manifest.json` directly on the release PR takes priority.
+Releases use [tagpr](https://github.com/Songmu/tagpr). A push to main creates a release PR that bumps `version` in `manifest.json` and updates `CHANGELOG.md`. Merging that release PR creates the tag and the GitHub Release, and attaches the zip for the Chrome Web Store (`url-gate-<version>.zip`) to the GitHub Release. The zip leaves out the files the extension does not need at runtime and the `key` in `manifest.json`. Publishing to the Chrome Web Store is a manual step: that zip is uploaded in the developer dashboard and goes through review. The default bump is a patch. Add a `tagpr:minor` / `tagpr:major` label to the release PR, or a `minor` / `major` label to a PR included in the release, to change it. Editing `version` in `manifest.json` directly on the release PR takes priority.
 
 ## License
 
